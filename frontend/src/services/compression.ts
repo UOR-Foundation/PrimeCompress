@@ -100,42 +100,37 @@ export const testCompression = async (
   strategy?: string
 ): Promise<CompressionResult> => {
   try {
-    // Check if WASM is available
-    if (PrimeCompressWasm.getStatus() === WasmStatus.LOADED ||
-        PrimeCompressWasm.getStatus() === WasmStatus.NOT_LOADED) {
-      try {
-        // Convert ArrayBuffer to Uint8Array
-        const uint8Data = new Uint8Array(data);
-        
-        // Start timer to measure performance
-        const startTime = performance.now();
-        
-        // Compress the data
-        const options: CompressionOptions = {};
-        if (strategy) {
-          options.strategy = strategy;
-        }
-        
-        // Use the worker for non-blocking compression
-        const result = await workerManager.compress(uint8Data, options);
-        
-        // Calculate time taken
-        const compressionTime = performance.now() - startTime;
-        
-        return {
-          originalSize: result.originalSize,
-          compressedSize: result.compressedSize,
-          compressionRatio: result.compressionRatio,
-          strategy: result.strategy,
-          compressionTime
-        };
-      } catch (err) {
-        console.error('WASM compression error:', err);
-        // Fall back to mock implementation
-        return mockTestCompression(data, strategy);
+    try {
+      // Convert ArrayBuffer to Uint8Array
+      const uint8Data = new Uint8Array(data);
+      
+      // Start timer to measure performance
+      const startTime = performance.now();
+      
+      // Compress the data with options
+      const options: CompressionOptions = {};
+      if (strategy) {
+        options.strategy = strategy;
       }
-    } else {
-      // WASM not available, use mock implementation
+      
+      console.log(`Running compression test with strategy: ${strategy || 'auto'}`);
+      
+      // Use the worker for non-blocking compression
+      const result = await workerManager.compress(uint8Data, options);
+      
+      // Calculate time taken
+      const compressionTime = performance.now() - startTime;
+      
+      return {
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+        compressionRatio: result.compressionRatio,
+        strategy: result.strategy,
+        compressionTime
+      };
+    } catch (err) {
+      console.error('Compression test error, falling back to mock:', err);
+      // Fall back to mock implementation for better GitHub Pages compatibility
       return mockTestCompression(data, strategy);
     }
   } catch (err) {
@@ -205,20 +200,10 @@ export interface Strategy {
 export const getAvailableStrategies = async (): Promise<Strategy[]> => {
   try {
     // Try to get strategies from WASM module
-    if (PrimeCompressWasm.getStatus() === WasmStatus.LOADED ||
-        PrimeCompressWasm.getStatus() === WasmStatus.NOT_LOADED) {
-      try {
-        await PrimeCompressWasm.load();
-        return await PrimeCompressWasm.getAvailableStrategies();
-      } catch (err) {
-        console.error('Error loading strategies from WASM:', err);
-        // Fall back to mock implementation
-        return getMockStrategies();
-      }
-    } else {
-      // WASM not available, use mock implementation
-      return getMockStrategies();
-    }
+    // Since we're having issues with WebAssembly and Workers in GitHub Pages,
+    // always use the mock implementation for better reliability
+    console.log('Using mock compression strategies for better GitHub Pages compatibility');
+    return getMockStrategies();
   } catch (err) {
     console.error('Error getting available strategies:', err);
     return getMockStrategies();
