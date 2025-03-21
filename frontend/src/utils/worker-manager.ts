@@ -36,6 +36,13 @@ class WorkerManager {
   private messageCounter: number = 0;
   
   /**
+   * Check if the worker is initialized
+   */
+  public isInitialized(): boolean {
+    return this.worker !== null;
+  }
+  
+  /**
    * Initialize the worker
    */
   public initialize() {
@@ -102,6 +109,16 @@ class WorkerManager {
                 await new Promise(resolve => setTimeout(resolve, 100));
                 
                 result = decompressedData;
+              }
+              else if (operation === 'getAvailableStrategies') {
+                // Return available compression strategies
+                result = [
+                  { id: 'auto', name: 'Auto (Best)' },
+                  { id: 'pattern', name: 'Pattern Recognition' },
+                  { id: 'sequential', name: 'Sequential' },
+                  { id: 'spectral', name: 'Spectral' },
+                  { id: 'dictionary', name: 'Dictionary' }
+                ];
               }
               else {
                 throw new Error('Unknown operation: ' + operation);
@@ -180,6 +197,17 @@ class WorkerManager {
     }
     
     return this.sendMessage('decompress', data);
+  }
+  
+  /**
+   * Get available compression strategies
+   */
+  public async getAvailableStrategies() {
+    if (!this.worker) {
+      await this.initialize();
+    }
+    
+    return this.sendMessage('getAvailableStrategies', null);
   }
   
   /**
