@@ -43,6 +43,16 @@ PrimeCompress delivers impressive compression ratios:
 
 Overall average improvement: **40.97%**
 
+### Hutter Prize Benchmark
+
+Our compression performance is measured against the [Hutter Prize](http://prize.hutter1.net/) dataset (enwik8), a standard benchmark in the compression community:
+
+[![Compression Ratio](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/UOR-Foundation/PrimeCompress/main/badges/hutter-ratio.json)](https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml)
+[![Bits Per Character](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/UOR-Foundation/PrimeCompress/main/badges/hutter-bpc.json)](https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml)
+[![Best Algorithm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/UOR-Foundation/PrimeCompress/main/badges/hutter-algo.json)](https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml)
+
+You can run the benchmark yourself by triggering the "Hutter Prize Benchmark" workflow in the Actions tab.
+
 ## Installation
 
 From GitHub Packages:

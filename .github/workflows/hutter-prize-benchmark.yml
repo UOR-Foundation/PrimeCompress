@@ -1,0 +1,320 @@
+name: Hutter Prize Benchmark
+
+on:
+  workflow_dispatch:  # Allow manual triggering
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/hutter-prize-benchmark.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+
+jobs:
+  benchmark:
+    name: Run Hutter Prize Benchmark
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Create Benchmark Directory
+        run: mkdir -p benchmarks/data
+        
+      - name: Download Hutter Prize Dataset
+        run: |
+          # Download enwik8 (first 100MB of English Wikipedia)
+          wget -q -O benchmarks/data/enwik8.zip http://mattmahoney.net/dc/enwik8.zip
+          unzip -q benchmarks/data/enwik8.zip -d benchmarks/data/
+          
+          # Download enwik9 if we want to test with larger dataset (first 1GB)
+          # Only if explicitly requested via workflow_dispatch with parameter
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.full_dataset }}" == "true" ]]; then
+            wget -q -O benchmarks/data/enwik9.zip http://mattmahoney.net/dc/enwik9.zip
+            unzip -q benchmarks/data/enwik9.zip -d benchmarks/data/
+          fi
+      
+      - name: Create Benchmark Script
+        run: |
+          cat > benchmarks/run-hutter-benchmark.js << 'EOF'
+          /**
+           * Hutter Prize Benchmark for PrimeCompress
+           * 
+           * This script benchmarks the PrimeCompress library against the Hutter Prize dataset
+           * (enwik8 - first 100MB of English Wikipedia) and compares it with baseline
+           * compression algorithms.
+           */
+          
+          const fs = require('fs');
+          const path = require('path');
+          const zlib = require('zlib');
+          const { performance } = require('perf_hooks');
+          
+          // Import PrimeCompress
+          const primeCompress = require('../src/core/unified-compression.js');
+          
+          // Paths
+          const DATA_DIR = path.join(__dirname, 'data');
+          const ENWIK8_PATH = path.join(DATA_DIR, 'enwik8');
+          const ENWIK9_PATH = path.join(DATA_DIR, 'enwik9');
+          
+          // Read input data
+          console.log('Reading enwik8 (100MB Wikipedia dataset)...');
+          const enwik8 = fs.readFileSync(ENWIK8_PATH);
+          console.log(`File size: ${formatSize(enwik8.length)}`);
+          
+          // Check if enwik9 exists
+          let enwik9;
+          if (fs.existsSync(ENWIK9_PATH)) {
+            console.log('Reading enwik9 (1GB Wikipedia dataset)...');
+            enwik9 = fs.readFileSync(ENWIK9_PATH);
+            console.log(`File size: ${formatSize(enwik9.length)}`);
+          }
+          
+          // Results table
+          const results = [];
+          
+          // Run benchmarks
+          console.log('\n=== Running Benchmarks ===\n');
+          
+          // Baseline: Gzip level 6 (standard)
+          benchmarkAlgorithm('gzip-6', enwik8, 
+            data => zlib.gzipSync(data, { level: 6 }),
+            data => zlib.gunzipSync(data)
+          );
+          
+          // Baseline: Gzip level 9 (maximum)
+          benchmarkAlgorithm('gzip-9', enwik8, 
+            data => zlib.gzipSync(data, { level: 9 }),
+            data => zlib.gunzipSync(data)
+          );
+          
+          // Baseline: Brotli (high compression)
+          benchmarkAlgorithm('brotli-11', enwik8, 
+            data => zlib.brotliCompressSync(data, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } }),
+            data => zlib.brotliDecompressSync(data)
+          );
+          
+          // PrimeCompress auto (Best strategy)
+          benchmarkAlgorithm('primecompress-auto', enwik8, 
+            data => {
+              const result = primeCompress.compressData(data, { strategy: 'auto' });
+              return result.compressedData;
+            },
+            data => primeCompress.decompressData(data)
+          );
+          
+          // PrimeCompress dictionary (likely best for text)
+          benchmarkAlgorithm('primecompress-dictionary', enwik8, 
+            data => {
+              const result = primeCompress.compressData(data, { strategy: 'dictionary' });
+              return result.compressedData;
+            },
+            data => primeCompress.decompressData(data)
+          );
+          
+          // PrimeCompress with block-based compression
+          benchmarkAlgorithm('primecompress-block', enwik8, 
+            data => {
+              const result = primeCompress.compressData(data, { useBlocks: true });
+              return result.compressedData;
+            },
+            data => primeCompress.decompressData(data)
+          );
+          
+          // If enwik9 exists, run tests on it too
+          if (enwik9) {
+            console.log('\n=== Running Benchmarks on enwik9 (1GB) ===\n');
+            
+            // Only run the most promising algorithms on the large dataset
+            benchmarkAlgorithm('gzip-9', enwik9, 
+              data => zlib.gzipSync(data, { level: 9 }),
+              data => zlib.gunzipSync(data)
+            );
+            
+            // PrimeCompress with block-based compression
+            benchmarkAlgorithm('primecompress-block', enwik9, 
+              data => {
+                const result = primeCompress.compressData(data, { useBlocks: true });
+                return result.compressedData;
+              },
+              data => primeCompress.decompressData(data)
+            );
+          }
+          
+          // Print results table
+          console.log('\n=== Benchmark Results ===\n');
+          console.log('| Algorithm | Original Size | Compressed Size | Ratio | Compression Time | Decompression Time | Bits Per Character |');
+          console.log('|-----------|---------------|-----------------|-------|------------------|--------------------|--------------------|');
+          
+          for (const result of results) {
+            console.log(
+              `| ${result.name} | ${formatSize(result.originalSize)} | ` +
+              `${formatSize(result.compressedSize)} | ${result.ratio.toFixed(2)}x | ` +
+              `${formatTime(result.compressTime)} | ${formatTime(result.decompressTime)} | ` +
+              `${result.bitsPerChar.toFixed(4)} |`
+            );
+          }
+          
+          // Generate GitHub Actions output
+          if (process.env.GITHUB_ACTIONS === 'true') {
+            // Set the best compression ratio as output
+            const bestResult = results.reduce((best, current) => 
+              current.ratio > best.ratio ? current : best, results[0]);
+            console.log(`::set-output name=best_algorithm::${bestResult.name}`);
+            console.log(`::set-output name=best_ratio::${bestResult.ratio.toFixed(4)}`);
+            console.log(`::set-output name=best_bpc::${bestResult.bitsPerChar.toFixed(4)}`);
+          }
+          
+          // Save results to JSON file
+          fs.writeFileSync(
+            path.join(__dirname, 'benchmark-results.json'), 
+            JSON.stringify(results, null, 2)
+          );
+          
+          // Utility function to benchmark a compression algorithm
+          function benchmarkAlgorithm(name, data, compressFunc, decompressFunc) {
+            console.log(`Benchmarking ${name}...`);
+            
+            // Compression
+            const compressStart = performance.now();
+            const compressed = compressFunc(data);
+            const compressTime = performance.now() - compressStart;
+            
+            // Decompression
+            const decompressStart = performance.now();
+            const decompressed = decompressFunc(compressed);
+            const decompressTime = performance.now() - decompressStart;
+            
+            // Verify correctness
+            const isValid = Buffer.compare(data, decompressed) === 0;
+            if (!isValid) {
+              console.error(`❌ Decompression failed for ${name}!`);
+              return;
+            }
+            
+            // Calculate metrics
+            const originalSize = data.length;
+            const compressedSize = compressed.length;
+            const ratio = originalSize / compressedSize;
+            const bitsPerChar = compressedSize * 8 / originalSize;
+            
+            console.log(`✓ ${name}: ${formatSize(compressedSize)} (${ratio.toFixed(2)}x)`);
+            
+            // Store results
+            results.push({
+              name,
+              originalSize,
+              compressedSize,
+              ratio,
+              compressTime,
+              decompressTime,
+              bitsPerChar
+            });
+          }
+          
+          // Format size in human-readable form
+          function formatSize(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+            if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+            return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+          }
+          
+          // Format time in human-readable form
+          function formatTime(ms) {
+            if (ms < 1) return `${(ms * 1000).toFixed(2)} μs`;
+            if (ms < 1000) return `${ms.toFixed(2)} ms`;
+            return `${(ms / 1000).toFixed(2)} s`;
+          }
+          EOF
+          
+      - name: Run Benchmark
+        id: benchmark
+        run: node benchmarks/run-hutter-benchmark.js
+        
+      - name: Generate Benchmark Badge
+        run: |
+          # Create a badge for the results
+          BEST_RATIO=$(cat benchmarks/benchmark-results.json | jq -r 'max_by(.ratio) | .ratio')
+          BEST_ALGO=$(cat benchmarks/benchmark-results.json | jq -r 'max_by(.ratio) | .name')
+          BEST_BPC=$(cat benchmarks/benchmark-results.json | jq -r 'min_by(.bitsPerChar) | .bitsPerChar')
+          
+          # Format to 2 decimal places
+          BEST_RATIO=$(printf "%.2f" $BEST_RATIO)
+          BEST_BPC=$(printf "%.4f" $BEST_BPC)
+          
+          # Create badge JSON files
+          mkdir -p public/badges
+          
+          # Ratio badge
+          cat > public/badges/hutter-ratio.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "compression ratio",
+            "message": "${BEST_RATIO}x",
+            "color": "blue"
+          }
+          EOF
+          
+          # BPC badge
+          cat > public/badges/hutter-bpc.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "bits per character",
+            "message": "${BEST_BPC} bpc",
+            "color": "green"
+          }
+          EOF
+          
+          # Algorithm badge
+          cat > public/badges/hutter-algo.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "best algorithm",
+            "message": "${BEST_ALGO}",
+            "color": "purple"
+          }
+          EOF
+          
+      - name: Upload Benchmark Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: |
+            benchmarks/benchmark-results.json
+            public/badges/
+          
+      - name: Update README with Badges
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Create badges directory if it doesn't exist
+          mkdir -p badges
+          
+          # Copy badge files
+          cp public/badges/hutter-ratio.json badges/
+          cp public/badges/hutter-bpc.json badges/
+          cp public/badges/hutter-algo.json badges/
+          
+          # Commit and push if there are changes
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add badges/
+          git commit -m "Update Hutter Prize benchmark badges [skip ci]" || echo "No changes to commit"
+          git push
