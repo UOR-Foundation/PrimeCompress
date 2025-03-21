@@ -46,6 +46,12 @@ interface ErrorResponse {
 
 type WorkerResponse = SuccessResponse | ErrorResponse;
 
+// Create a worker context
+declare const self: {
+  onmessage: (event: MessageEvent<WorkerMessage>) => void;
+  postMessage: (message: any) => void;
+};
+
 // Handle incoming messages
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const message = event.data;

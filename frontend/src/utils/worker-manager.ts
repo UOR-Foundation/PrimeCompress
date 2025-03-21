@@ -149,7 +149,8 @@ class WorkerManager {
       this.worker = null;
       
       // Reject all pending requests
-      for (const request of this.pendingRequests.values()) {
+      const requests = Array.from(this.pendingRequests.values());
+      for (const request of requests) {
         request.reject(new Error('Worker terminated'));
       }
       
