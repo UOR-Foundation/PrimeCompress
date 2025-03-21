@@ -11,10 +11,10 @@
 
 // Import improved implementations
 const compression = require('./compression-wrapper.js');
-const spectral = require('./improved-spectral-compression.js');
-const pattern = require('./improved-pattern-compression.js');
-const dictionaryCompression = require('./improved-dictionary-compression.js');
-const sequential = require('./improved-sequential-compression.js');
+const spectral = require('../strategies/improved-spectral-compression.js');
+const pattern = require('../strategies/improved-pattern-compression.js');
+const dictionaryCompression = require('../strategies/improved-dictionary-compression.js');
+const sequential = require('../strategies/improved-sequential-compression.js');
 
 /**
  * Calculate checksum for data integrity
@@ -705,7 +705,7 @@ const BlockCompressor = {
       const block = blocks[i];
       
       // Select best strategy for this block
-      const { strategy, scores } = StrategyScorer.selectBestStrategy(block);
+      const { strategy } = StrategyScorer.selectBestStrategy(block);
       blockStrategies.push(strategy);
       
       // Compress the block with selected strategy

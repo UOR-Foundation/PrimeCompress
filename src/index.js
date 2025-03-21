@@ -7,6 +7,6 @@
  * @module prime-compress
  */
 
-const compression = require('../unified-compression.js');
+const compression = require('./core/unified-compression.js');
 
 module.exports = compression;

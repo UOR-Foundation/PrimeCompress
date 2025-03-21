@@ -111,16 +111,15 @@ losslessValidationContent = losslessValidationContent.replace(
 fs.writeFileSync(losslessValidationPath, losslessValidationContent, 'utf8');
 
 // Set a version field in the compression module
-const compressionWrapper = require('./compression-wrapper.js');
+const compressionWrapper = require('../src/core/compression-wrapper.js');
 compressionWrapper.version = '1.0.0';
 
 // Patch internal functions in the original module
-const originalCompression = require('./prime-compression.js');
+const originalCompression = require('../prime-compression.js');
 
 // Add versioning to original module's results
 const originalCompress = originalCompression.compress;
 const originalCompressWithStrategy = originalCompression.compressWithStrategy;
-const originalDecompress = originalCompression.decompress;
 
 // Add version field to all compression results from the original module
 originalCompression.compress = function(data, options) {
@@ -202,10 +201,10 @@ require.cache[require.resolve('./prime-compression.js')] = {
 };
 
 // Run the various test suites
-console.log("Running unified compression tests...");
+console.log('Running unified compression tests...');
 require('./tests/unified-compression.test.js');
 
-console.log("\nRunning lossless validation tests...");
+console.log('\nRunning lossless validation tests...');
 require('./tests/lossless-validation.test.js');
 
 // Restore the original module after tests are complete

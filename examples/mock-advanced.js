@@ -11,7 +11,7 @@ const compression = {
   /**
    * Analyze data to determine the best compression technique
    */
-  analyzeData: function(data, options = {}) {
+  analyzeData: function(data) {
     // For sequence data, recommend spectral technique
     if (isSequenceData(data)) {
       return {

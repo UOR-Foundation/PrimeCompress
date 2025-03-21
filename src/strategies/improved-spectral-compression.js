@@ -174,7 +174,6 @@ function detectSpectralPattern(data, options = {}) {
   magnitudes.sort((a, b) => b.magnitude - a.magnitude);
   
   // Check if it's dominated by a few frequencies
-  const threshold = options.threshold || 0.1;
   let totalMagnitude = 0;
   let significantComponents = [];
   

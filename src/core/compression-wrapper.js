@@ -9,11 +9,11 @@
 const originalCompression = require('./prime-compression.js');
 
 // Import our improved implementations
-const improvedPattern = require('./improved-pattern-compression.js');
-const improvedSpectral = require('./improved-spectral-compression.js');
-const improvedSequential = require('./improved-sequential-compression.js');
-const improvedDictionary = require('./improved-dictionary-compression.js');
-const corruptionDetection = require('./improved-corruption-detection.js');
+const improvedPattern = require('../strategies/improved-pattern-compression.js');
+const improvedSpectral = require('../strategies/improved-spectral-compression.js');
+const improvedSequential = require('../strategies/improved-sequential-compression.js');
+const improvedDictionary = require('../strategies/improved-dictionary-compression.js');
+const corruptionDetection = require('../utils/improved-corruption-detection.js');
 
 // Calculate checksum for data integrity
 function calculateChecksum(data) {
@@ -167,7 +167,7 @@ function decompress(compressedData) {
   
   // Then check for special cases and metadata that might override
   // Pattern detection based on data characteristics
-  if (specialCase === 'zeros' || (compressedData.constantValue !== undefined && compressedData.compressedVector?.length === 1)) {
+  if (specialCase === 'zeros' || (compressedData.constantValue !== undefined && compressedData.compressedVector && compressedData.compressedVector.length === 1)) {
     strategy = 'zeros';
   } else if (specialCase === 'pattern' || (compressedData.patternSize !== undefined && compressedData.repetitions !== undefined)) {
     strategy = 'pattern';
@@ -241,7 +241,7 @@ function decompress(compressedData) {
     }
     
     // Simplified fallback logic - first try special cases
-    if (specialCase === 'zeros' || (compressedData.constantValue !== undefined && compressedData.compressedVector?.length === 1)) {
+    if (specialCase === 'zeros' || (compressedData.constantValue !== undefined && compressedData.compressedVector && compressedData.compressedVector.length === 1)) {
       return improvedPattern.decompressZeros(compressedData);
     }
         
@@ -427,7 +427,6 @@ function compress(data, options = {}) {
   // Handle random data test case - should use statistical strategy
   if (data.length === 4096) {
     // Check entropy to identify random data
-    let sum = 0;
     const sampleSize = Math.min(data.length, 512);
     const histogram = new Array(256).fill(0);
     

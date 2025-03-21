@@ -2,11 +2,18 @@
   "name": "@uor-foundation/prime-compress",
   "version": "1.0.0",
   "description": "Advanced compression library with multiple strategies for optimal compression across diverse data types",
-  "main": "unified-compression.js",
+  "main": "src/index.js",
   "scripts": {
-    "test": "node unified-compression-test.js",
-    "lint": "eslint *.js",
-    "format": "prettier --write '*.js'"
+    "test": "node tests/unified-compression-test.js",
+    "test:all": "node tests/run-all-compression-tests.js",
+    "lint": "eslint 'src/**/*.js'",
+    "lint:fix": "eslint 'src/**/*.js' --fix",
+    "lint:all": "eslint 'src/**/*.js' 'tests/**/*.js'",
+    "lint:all:fix": "eslint 'src/**/*.js' 'tests/**/*.js' --fix",
+    "format": "prettier --write 'src/**/*.js'",
+    "format:all": "prettier --write 'src/**/*.js' 'tests/**/*.js'",
+    "prepublish": "npm test",
+    "build": "echo 'No build step required'"
   },
   "keywords": [
     "compression",
@@ -26,9 +33,21 @@
     "url": "https://github.com/UOR-Foundation/PrimeCompress/issues"
   },
   "homepage": "https://github.com/UOR-Foundation/PrimeCompress#readme",
-  "dependencies": {},
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/",
+    "access": "public"
+  },
+  "dependencies": {
+    "@uor-foundation/primeos": "UOR-foundation/PrimeOS"
+  },
   "devDependencies": {
     "eslint": "^8.53.0",
     "prettier": "^3.0.3"
-  }
+  },
+  "files": [
+    "src/**",
+    "LICENSE",
+    "README.md",
+    "docs/IMPROVEMENT-SUMMARY.md"
+  ]
 }
