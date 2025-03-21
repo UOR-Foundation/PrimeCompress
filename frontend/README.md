@@ -61,14 +61,30 @@ The application is also set up with a GitHub Action workflow that automatically 
 
 ## WebAssembly Integration
 
-The PrimeCompress library is compiled to WebAssembly and integrated using a singleton module pattern:
+The PrimeCompress library integration is designed to use WebAssembly with a singleton module pattern:
 
-1. The WebAssembly module is loaded when the application starts
+1. Currently uses a mock implementation that will be replaced with actual WebAssembly bindings
 2. Compression operations run in a Web Worker to prevent UI blocking
 3. The application can handle large files efficiently
-4. Multiple compression strategies are available
+4. Multiple compression strategies are available:
+   - Pattern Recognition
+   - Sequential
+   - Spectral
+   - Dictionary
+   - Auto (selects best strategy)
 
-See the `/src/wasm` directory for implementation details.
+See the `/src/wasm` directory for implementation details. The transition from mock to real WebAssembly will be seamless as all interfaces are already defined.
+
+### Implementing Real WebAssembly
+
+To replace the mock implementation with real WebAssembly:
+
+1. Compile the PrimeCompress C/C++ code to WebAssembly
+2. Place the compiled `.wasm` file in the `/public` directory
+3. Update `prime-compress-wasm.ts` to load the real WebAssembly module
+4. Implement the actual compression/decompression logic using the WebAssembly exports
+
+The service layer and UI components will continue to work without changes once the WebAssembly implementation is in place.
 
 ## Project Structure
 
