@@ -6,8 +6,7 @@
 // Import our local prime compression implementation
 const primeCompression = require('./prime-compression');
 
-// Import Node.js modules for file operations
-const fs = require('fs');
+// Import Node.js modules
 const crypto = require('crypto');
 
 // Create a more advanced wrapper around our compression module
@@ -83,6 +82,7 @@ const advanced = {
         case 'standard':
         default:
           // Use our prime compression implementation
+          // eslint-disable-next-line no-case-declarations
           const compressed = primeCompression.compress(data);
           // Add the technique identifier
           compressed.compressionType = 'standard';
@@ -282,9 +282,9 @@ function compressWithCoherence(data, checksum) {
 /**
  * Simplified implementation to find principal frequencies in data
  */
-function findPrincipalFrequencies(data) {
+function findPrincipalFrequencies() {
   // This is a simplified implementation that just returns dummy values
-  // In a real implementation, this would use FFT or similar algorithm
+  // In a real implementation, this would use FFT or similar algorithm on the data
   
   // Return 3 dummy frequencies for demonstration
   return [
@@ -302,8 +302,9 @@ function decompressSequence(compressedData) {
       compressedData.spectralEnhancement.type === 'differential' &&
       compressedData.spectralEnhancement.modulo === 100) {
     
-    const start = compressedData.spectralEnhancement.start || 0;
-    const diff = compressedData.spectralEnhancement.diff || 1;
+    // These values could be used in a more sophisticated implementation
+    // const start = compressedData.spectralEnhancement.start || 0;
+    // const diff = compressedData.spectralEnhancement.diff || 1;
     const length = compressedData.spectralEnhancement.length;
     const modulo = compressedData.spectralEnhancement.modulo || 100;
     
@@ -408,12 +409,12 @@ function generateTestData() {
   sequenceData.patternModulo = 100;
   
   // Double check the sequence data is consistent
-  console.log("Sequence Data Sample: " + 
-            Array.from(sequenceData.slice(0, 10)).join(", ") +
-            "... (values 0-9)");
-  console.log("Sequence Data Sample End: " + 
-            Array.from(sequenceData.slice(990, 1000)).join(", ") +
-            "... (values 990-999)");
+  console.log('Sequence Data Sample: ' + 
+            Array.from(sequenceData.slice(0, 10)).join(', ') +
+            '... (values 0-9)');
+  console.log('Sequence Data Sample End: ' + 
+            Array.from(sequenceData.slice(990, 1000)).join(', ') +
+            '... (values 990-999)');
   
   // Verify all values are in correct range
   for (let i = 0; i < sequenceData.length; i++) {
@@ -457,8 +458,8 @@ function generateTestData() {
 
 // Main function to run compression examples
 async function runCompressionExamples() {
-  console.log("Advanced Prime Compression Example");
-  console.log("==================================");
+  console.log('Advanced Prime Compression Example');
+  console.log('==================================');
   
   // Generate test data
   const testData = generateTestData();
@@ -469,14 +470,14 @@ async function runCompressionExamples() {
   // For each test case
   for (const [name, data] of Object.entries(testData)) {
     console.log(`\nTest Case: ${name} (${data.length} bytes)`);
-    console.log("-".repeat(50));
+    console.log('-'.repeat(50));
     
     // Get original checksum for verification
     const originalChecksum = calculateChecksum(data);
     console.log(`Original checksum: ${originalChecksum.substring(0, 16)}...`);
     
     // Analyze data to determine best compression approach
-    console.log("\nAnalyzing data...");
+    console.log('\nAnalyzing data...');
     
     // Special handling for our test sequence data
     let options = {};
@@ -529,15 +530,15 @@ async function runCompressionExamples() {
         
         // For sequence data, add detailed verification
         if (name === 'sequence' && !verified) {
-          console.log("Detailed sequence verification:");
-          console.log("Original checksum: " + originalChecksum);
-          console.log("Decompressed checksum: " + decompressedChecksum);
+          console.log('Detailed sequence verification:');
+          console.log('Original checksum: ' + originalChecksum);
+          console.log('Decompressed checksum: ' + decompressedChecksum);
           
           // Check first few values
-          console.log("Original sequence first 10 values:", 
-              Array.from(data.slice(0, 10)).join(", "));
-          console.log("Decompressed sequence first 10 values:", 
-              Array.from(decompressed.slice(0, 10)).join(", "));
+          console.log('Original sequence first 10 values:', 
+              Array.from(data.slice(0, 10)).join(', '));
+          console.log('Decompressed sequence first 10 values:', 
+              Array.from(decompressed.slice(0, 10)).join(', '));
           
           // Count mismatches
           let mismatchCount = 0;
@@ -557,7 +558,7 @@ async function runCompressionExamples() {
             console.log(`Original value: ${data[firstMismatchIndex]}, Decompressed value: ${decompressed[firstMismatchIndex]}`);
             
             if (firstMismatchIndex > 0) {
-              console.log(`Previous values:`);
+              console.log('Previous values:');
               console.log(`Index ${firstMismatchIndex-1}: Original ${data[firstMismatchIndex-1]}, Decompressed ${decompressed[firstMismatchIndex-1]}`);
             }
           }
@@ -580,10 +581,10 @@ async function runCompressionExamples() {
   }
   
   // Print summary table
-  console.log("\n\nCompression Results Summary");
-  console.log("===========================");
-  console.log("Data Type      | Size  | Technique   | Ratio | Verify |");
-  console.log("---------------|-------|-------------|-------|--------|");
+  console.log('\n\nCompression Results Summary');
+  console.log('===========================');
+  console.log('Data Type      | Size  | Technique   | Ratio | Verify |');
+  console.log('---------------|-------|-------------|-------|--------|');
   
   for (const [name, result] of Object.entries(results)) {
     const originalSize = result.originalSize;
@@ -608,7 +609,7 @@ async function runCompressionExamples() {
     );
   }
   
-  console.log("\nAdvanced Compression Test Complete!");
+  console.log('\nAdvanced Compression Test Complete!');
 }
 
 // Run the examples

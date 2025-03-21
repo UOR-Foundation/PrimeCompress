@@ -351,9 +351,6 @@ function decompressDictionary(compressedData) {
     throw new Error('Invalid dictionary compressed data');
   }
   
-  // Check for text-like flag to determine encoding strategy
-  const isTextLike = compressedData.isTextLike;
-  
   // Handle our advanced encoding with high-frequency markers
   const highFrequencyCount = Math.min(dictionary.length, 14);
   

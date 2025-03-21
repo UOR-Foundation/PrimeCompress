@@ -39,6 +39,18 @@ Overall average improvement: **40.97%**
 
 ## Installation
 
+From GitHub Packages:
+
+```bash
+# Configure npm to use GitHub Packages
+echo "@uor-foundation:registry=https://npm.pkg.github.com" >> .npmrc
+
+# Install the package
+npm install @uor-foundation/prime-compress
+```
+
+From source:
+
 ```bash
 npm install
 ```
@@ -46,7 +58,11 @@ npm install
 ## Usage
 
 ```javascript
-const compression = require('./unified-compression.js');
+// When installed from npm
+const compression = require('@uor-foundation/prime-compress');
+
+// OR when using from source
+// const compression = require('./unified-compression.js');
 
 // Compress data
 const compressedData = compression.compress(data);
@@ -109,6 +125,33 @@ Run the comprehensive test suite:
 ```bash
 node unified-compression-test.js
 ```
+
+## Publishing
+
+This package is configured to publish to GitHub Packages. 
+
+### Automatic Publishing (CI/CD)
+
+The package will automatically be published to GitHub Packages when a new release is created on GitHub.
+
+### Manual Publishing
+
+To publish manually:
+
+1. Log in to the GitHub Packages registry:
+   ```bash
+   npm login --registry=https://npm.pkg.github.com
+   ```
+
+2. Update the version in package.json:
+   ```bash
+   npm version patch  # or minor, or major
+   ```
+
+3. Publish the package:
+   ```bash
+   npm publish
+   ```
 
 ## License
 

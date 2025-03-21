@@ -15,13 +15,13 @@ function formatBytes(bytes) {
 
 // Example 1: Compressing text data
 function textCompressionExample() {
-  console.log("\n==== Text Compression Example ====");
+  console.log('\n==== Text Compression Example ====');
   
   // Create text sample
-  const text = "This is a sample text that contains repeated words. " +
-               "Compression works well when text contains repeated words " +
-               "and patterns that can be efficiently encoded using dictionary " +
-               "compression techniques like Huffman coding.";
+  const text = 'This is a sample text that contains repeated words. ' +
+               'Compression works well when text contains repeated words ' +
+               'and patterns that can be efficiently encoded using dictionary ' +
+               'compression techniques like Huffman coding.';
   
   // Convert to Uint8Array
   const textData = new Uint8Array(Buffer.from(text));
@@ -32,14 +32,14 @@ function textCompressionExample() {
   console.log(`Analysis: Entropy ${analysis.entropy.toFixed(2)}, recommended strategy: ${analysis.recommendedStrategy}`);
   
   // Compress
-  console.log("Compressing...");
+  console.log('Compressing...');
   const compressed = compression.compress(textData);
   console.log(`Compressed size: ${formatBytes(compressed.compressedSize)}`);
   console.log(`Compression ratio: ${compressed.compressionRatio.toFixed(2)}x`);
   console.log(`Strategy used: ${compressed.strategy}`);
   
   // Decompress
-  console.log("Decompressing...");
+  console.log('Decompressing...');
   const decompressed = compression.decompress(compressed);
   
   // Verify
@@ -50,7 +50,7 @@ function textCompressionExample() {
 
 // Example 2: Compressing pattern data
 function patternCompressionExample() {
-  console.log("\n==== Pattern Compression Example ====");
+  console.log('\n==== Pattern Compression Example ====');
   
   // Create a repeating pattern
   const pattern = [1, 2, 3, 4, 5, 4, 3, 2];
@@ -67,14 +67,14 @@ function patternCompressionExample() {
   console.log(`Analysis: Entropy ${analysis.entropy.toFixed(2)}, recommended strategy: ${analysis.recommendedStrategy}`);
   
   // Compress
-  console.log("Compressing...");
+  console.log('Compressing...');
   const compressed = compression.compress(patternData);
   console.log(`Compressed size: ${formatBytes(compressed.compressedSize)}`);
   console.log(`Compression ratio: ${compressed.compressionRatio.toFixed(2)}x`);
   console.log(`Strategy used: ${compressed.strategy}`);
   
   // Decompress
-  console.log("Decompressing...");
+  console.log('Decompressing...');
   const decompressed = compression.decompress(compressed);
   
   // Verify
@@ -85,7 +85,7 @@ function patternCompressionExample() {
 
 // Example 3: Compressing mixed data with block-based approach
 function blockBasedCompressionExample() {
-  console.log("\n==== Block-Based Compression Example ====");
+  console.log('\n==== Block-Based Compression Example ====');
   
   // Create mixed data with multiple patterns
   const mixedData = new Uint8Array(12288); // 12KB
@@ -101,7 +101,7 @@ function blockBasedCompressionExample() {
   }
   
   // Block 3: Text-like data
-  const text = "This is block-based compression demonstration text. ";
+  const text = 'This is block-based compression demonstration text. ';
   for (let i = 0; i < 4096; i++) {
     mixedData[8192 + i] = text.charCodeAt(i % text.length);
   }
@@ -109,7 +109,7 @@ function blockBasedCompressionExample() {
   console.log(`Original size: ${formatBytes(mixedData.length)}`);
   
   // Compress with explicit block-based option
-  console.log("Compressing with block-based strategy...");
+  console.log('Compressing with block-based strategy...');
   const compressed = compression.compress(mixedData, { useBlocks: true });
   console.log(`Compressed size: ${formatBytes(compressed.compressedSize)}`);
   console.log(`Compression ratio: ${compressed.compressionRatio.toFixed(2)}x`);
@@ -117,11 +117,11 @@ function blockBasedCompressionExample() {
   
   // Get more details about blocks
   if (compressed.metadata && compressed.metadata.blockStrategies) {
-    console.log("Block strategies:", compressed.metadata.blockStrategies.join(", "));
+    console.log('Block strategies:', compressed.metadata.blockStrategies.join(', '));
   }
   
   // Decompress
-  console.log("Decompressing...");
+  console.log('Decompressing...');
   const decompressed = compression.decompress(compressed);
   
   // Verify

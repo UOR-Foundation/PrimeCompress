@@ -48,8 +48,6 @@ function decompressSequence(compressedData) {
       compressedData.spectralEnhancement.type === 'differential' &&
       compressedData.spectralEnhancement.modulo === 100) {
     
-    const start = compressedData.spectralEnhancement.start || 0;
-    const diff = compressedData.spectralEnhancement.diff || 1;
     const length = compressedData.spectralEnhancement.length;
     const modulo = compressedData.spectralEnhancement.modulo || 100;
     
