@@ -6,7 +6,7 @@
  */
 
 import workerManager from '../utils/worker-manager';
-import PrimeCompressWasm, { CompressionOptions, WasmStatus } from '../wasm/prime-compress-wasm';
+import { CompressionOptions } from '../wasm/prime-compress-wasm';
 
 // Interface for compression result
 export interface CompressionResult {
