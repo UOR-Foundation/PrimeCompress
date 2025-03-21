@@ -2,6 +2,12 @@
 
 A sophisticated compression library featuring multiple strategies for optimal compression across diverse data types. Built on mathematical principles and advanced compression techniques to achieve superior compression ratios for various data patterns.
 
+## Try it Online
+
+Visit our [PrimeCompress Web Application](https://uor-foundation.github.io/PrimeCompress/) to compress files directly in your browser using WebAssembly.
+
+![PrimeCompress Web App](./frontend/public/logo192.png)
+
 ## Features
 
 - **Strategy Selection**: Intelligent selection of compression strategy based on data characteristics
@@ -124,6 +130,35 @@ Run the comprehensive test suite:
 
 ```bash
 node unified-compression-test.js
+```
+
+## Web Application
+
+The PrimeCompress project includes a React-based web application that allows users to compress files directly in their browser using WebAssembly. The web application:
+
+- Runs completely client-side (no server required)
+- Uses WebAssembly for high-performance compression
+- Processes files in a Web Worker to prevent UI blocking
+- Provides multiple compression strategies
+- Shows detailed compression statistics
+
+The frontend code is located in the `./frontend` directory. See the [Frontend README](./frontend/README.md) for more details.
+
+### Development
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+### Deployment
+
+The web application is automatically deployed to GitHub Pages when changes are pushed to the main branch. You can also deploy it manually:
+
+```bash
+cd frontend
+npm run deploy
 ```
 
 ## Publishing
