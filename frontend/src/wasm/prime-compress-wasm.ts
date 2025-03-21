@@ -203,23 +203,95 @@ class PrimeCompressWasm {
    * Auto-select compression strategy based on data characteristics
    */
   private autoCompress(data: Uint8Array): { strategy: string, entropyScore: number } {
-    // Main logic ported from unified-compression.js's StrategyScorer
-    
-    // Calculate entropy
+    // For very large files, use block-based compression regardless
+    if (data.length > 5 * 1024 * 1024) { // >5MB
+      return { strategy: 'dictionary', entropyScore: 7.0 };
+    }
+
+    // Calculate entropy for strategy selection
     const entropy = this.calculateEntropy(data);
     
-    // Basic analysis
+    // Analyze data characteristics
     const stats = this.analyzeBlock(data);
     
-    // Decision logic
-    if (stats.isConstant) return { strategy: 'pattern', entropyScore: entropy };
-    if (stats.hasPattern) return { strategy: 'pattern', entropyScore: entropy };
-    if (stats.hasSequence) return { strategy: 'sequential', entropyScore: entropy };
-    if (stats.isTextLike) return { strategy: 'dictionary', entropyScore: entropy };
-    if (entropy > 7.0) return { strategy: 'spectral', entropyScore: entropy }; // High entropy data
+    // Create a scoring system for each strategy
+    const scores = {
+      pattern: 0,
+      sequential: 0,
+      dictionary: 0,
+      spectral: 0
+    };
     
-    // Default to dictionary for general data
-    return { strategy: 'dictionary', entropyScore: entropy };
+    // Score boost for obvious patterns
+    if (stats.isConstant) scores.pattern += 100;
+    if (stats.hasPattern) scores.pattern += 50;
+    
+    // Sequences are often arithmetic progressions
+    if (stats.hasSequence) scores.sequential += 70;
+    
+    // Text and structured data works well with dictionary compression
+    if (stats.isTextLike) scores.dictionary += 60;
+    
+    // Entropy-based scoring
+    if (entropy < 3.0) {
+      // Very low entropy - highly compressible with patterns
+      scores.pattern += 40;
+    } else if (entropy < 5.0) {
+      // Medium entropy - could be sequential or dictionary
+      scores.sequential += 30;
+      scores.dictionary += 20;
+    } else if (entropy < 7.0) {
+      // Higher entropy - dictionary is often best
+      scores.dictionary += 40;
+    } else {
+      // Very high entropy - spectral or just store as is
+      scores.spectral += 50;
+    }
+    
+    // Secondary scoring adjustments based on data size
+    if (data.length < 1024) {
+      // For very small data, pattern is often most efficient
+      scores.pattern += 15;
+    } else if (data.length > 100 * 1024) {
+      // For larger data, dictionary offers good compression
+      scores.dictionary += 20;
+    }
+    
+    // Analyze for periodic patterns that might benefit from spectral compression
+    if (stats.hasSpectralPattern) {
+      scores.spectral += 40;
+    }
+    
+    // Find the highest scoring strategy
+    let bestStrategy = 'dictionary'; // Default
+    let bestScore = scores.dictionary;
+    
+    if (scores.pattern > bestScore) {
+      bestStrategy = 'pattern';
+      bestScore = scores.pattern;
+    }
+    
+    if (scores.sequential > bestScore) {
+      bestStrategy = 'sequential';
+      bestScore = scores.sequential;
+    }
+    
+    if (scores.spectral > bestScore) {
+      bestStrategy = 'spectral';
+      bestScore = scores.spectral;
+    }
+    
+    // Extra check - if we're dealing with high-entropy data and no clear winner,
+    // spectral might be the best option
+    if (entropy > 7.0 && bestScore < 30) {
+      bestStrategy = 'spectral';
+    }
+    
+    // Debug log for strategy selection
+    console.debug(`Selected strategy: ${bestStrategy} (entropy: ${entropy.toFixed(2)}, scores: `, 
+                scores, `, isConstant: ${stats.isConstant}, hasPattern: ${stats.hasPattern}, hasSequence: ${stats.hasSequence}, isTextLike: ${stats.isTextLike})`);
+    
+    return { strategy: bestStrategy, entropyScore: entropy };
   }
 
   /**
@@ -283,38 +355,44 @@ class PrimeCompressWasm {
     // Basic pattern detection algorithm
     if (data.length < 8) return false;
     
-    // Check if all bytes are the same
+    // Sample the data for large arrays to improve performance
+    const MAX_SAMPLE_SIZE = 4096;
+    const sampleInterval = data.length > MAX_SAMPLE_SIZE ? Math.ceil(data.length / MAX_SAMPLE_SIZE) : 1;
+    
+    // Check if all bytes are the same (sampling for large data)
     const firstByte = data[0];
     let allSame = true;
-    for (let i = 1; i < Math.min(64, data.length); i++) {
-      if (data[i] !== firstByte) {
+    const sampleSize = Math.min(64, data.length);
+    
+    for (let i = 1; i < sampleSize; i++) {
+      const pos = i * sampleInterval < data.length ? i * sampleInterval : i;
+      if (data[pos] !== firstByte) {
         allSame = false;
         break;
       }
     }
-    if (allSame) return true;
     
-    // Check for repeating patterns (up to 8 bytes)
-    for (let patternLength = 2; patternLength <= 8; patternLength++) {
-      let isPattern = true;
-      for (let i = patternLength; i < Math.min(patternLength * 8, data.length); i++) {
-        if (data[i] !== data[i % patternLength]) {
-          isPattern = false;
-          break;
-        }
-      }
-      if (isPattern) return true;
-    }
+    // Quick exit for constant data
+    if (allSame && sampleSize >= 16) return true;
     
-    // Check for long runs of the same byte
+    // Check runs first as they're common and efficiently compressed
+    // Check for long runs of the same byte (at least 15% of total size or 8 bytes)
+    let runThreshold = Math.max(8, Math.floor(data.length * 0.15));
     let currentByte = data[0];
     let runLength = 1;
     let maxRunLength = 1;
+    let totalRunLength = 0;
     
-    for (let i = 1; i < data.length; i++) {
+    // Sample the data for large arrays
+    const runCheckLimit = Math.min(data.length, 10000);
+    
+    for (let i = 1; i < runCheckLimit; i++) {
       if (data[i] === currentByte) {
         runLength++;
       } else {
+        if (runLength >= 4) {
+          totalRunLength += runLength;
+        }
         currentByte = data[i];
         runLength = 1;
       }
@@ -324,8 +402,38 @@ class PrimeCompressWasm {
       }
     }
     
-    // If we have runs of 8+ bytes, consider it a pattern
-    if (maxRunLength >= 8) return true;
+    // If we have a significant portion as runs, it's a good candidate for pattern compression
+    const runRatio = totalRunLength / Math.min(data.length, runCheckLimit);
+    
+    // If we have runs of 8+ bytes, or total runs are >20% of the data, consider it a pattern
+    if (maxRunLength >= runThreshold || runRatio > 0.2) return true;
+    
+    // Check for repeating patterns (up to 8 bytes)
+    // Only check beginning portion of large files
+    const patternCheckLimit = Math.min(data.length, 1024); 
+    
+    for (let patternLength = 2; patternLength <= 8; patternLength++) {
+      // Skip patterns that don't divide evenly into the check length (improves performance)
+      if (patternCheckLimit % patternLength !== 0 && patternLength > 4) continue;
+      
+      let isPattern = true;
+      let matchCount = 0;
+      const minMatches = Math.min(8, Math.floor(patternCheckLimit / patternLength));
+      
+      for (let i = patternLength; i < patternCheckLimit; i++) {
+        if (data[i] !== data[i % patternLength]) {
+          isPattern = false;
+          break;
+        }
+        
+        if (i % patternLength === 0) {
+          matchCount++;
+          if (matchCount >= minMatches) break;
+        }
+      }
+      
+      if (isPattern && matchCount >= minMatches) return true;
+    }
     
     return false;
   }
@@ -336,16 +444,50 @@ class PrimeCompressWasm {
   private detectSequence(data: Uint8Array): boolean {
     if (data.length < 8) return false;
     
+    // Limit the check for large files
+    const MAX_CHECK = 256;
+    const checkSize = Math.min(MAX_CHECK, data.length);
+    
+    // For large files, sample at regular intervals
+    const samplingRate = data.length > 1000 ? Math.floor(data.length / 100) : 1;
+    
     // Check for arithmetic sequence (constant difference)
     const diffs = [];
-    for (let i = 1; i < Math.min(16, data.length); i++) {
-      diffs.push((data[i] - data[i-1] + 256) % 256); // Handle wrap around
+    let prevByte = data[0];
+    
+    // Collect differences, either sequential or sampled
+    if (samplingRate > 1) {
+      // Sampling approach for large files
+      for (let i = samplingRate; i < checkSize; i += samplingRate) {
+        diffs.push((data[i] - data[i-samplingRate] + 256) % 256);
+        prevByte = data[i];
+      }
+    } else {
+      // Regular sequential approach for smaller files
+      for (let i = 1; i < checkSize; i++) {
+        diffs.push((data[i] - data[i-1] + 256) % 256);
+        prevByte = data[i];
+      }
     }
     
-    const firstDiff = diffs[0];
-    const isArithmetic = diffs.every(diff => diff === firstDiff);
+    // Empty array check (should never happen but as safety)
+    if (diffs.length === 0) return false;
     
-    return isArithmetic;
+    // Check if all differences are the same
+    const firstDiff = diffs[0];
+    
+    // For long sequences, we allow a small error rate
+    if (diffs.length > 32) {
+      // Count matching diffs
+      const matches = diffs.filter(diff => diff === firstDiff).length;
+      const matchRatio = matches / diffs.length;
+      
+      // If >90% of differences match, consider it a sequence
+      return matchRatio > 0.9;
+    } else {
+      // For shorter sequences, require exact match
+      return diffs.every(diff => diff === firstDiff);
+    }
   }
 
   /**
@@ -680,25 +822,69 @@ class PrimeCompressWasm {
   private dictionaryCompress(data: Uint8Array): Uint8Array {
     if (data.length < 8) return data; // Too small to compress
     
-    // Build frequency table for Huffman coding
+    // For very large files, sample the data instead of scanning the whole file
+    const MAX_DICT_SCAN = 100000; // Maximum bytes to scan for dictionary building
+    const dictScanSize = Math.min(data.length, MAX_DICT_SCAN);
+    
+    // For extremely large files, use a different sampling strategy
+    let sampledData = data;
+    let samplingRate = 1;
+    
+    if (data.length > MAX_DICT_SCAN) {
+      samplingRate = Math.ceil(data.length / MAX_DICT_SCAN);
+      
+      // Create a representative sample that includes:
+      // 1. The beginning of the file (tends to have important patterns)
+      // 2. Regular samples throughout
+      // 3. The end of the file (often contains important patterns too)
+      const sampleSize = Math.min(MAX_DICT_SCAN, Math.ceil(data.length / samplingRate) + 1000);
+      sampledData = new Uint8Array(sampleSize);
+      
+      // Copy first 1000 bytes directly
+      const headSize = Math.min(1000, data.length);
+      for (let i = 0; i < headSize; i++) {
+        sampledData[i] = data[i];
+      }
+      
+      // Sample from the rest of the file
+      let samplePos = headSize;
+      for (let i = 1000; i < data.length - 1000; i += samplingRate) {
+        if (samplePos < sampledData.length) {
+          sampledData[samplePos++] = data[i];
+        }
+      }
+      
+      // Copy last 1000 bytes (or whatever space remains)
+      const tailStart = Math.max(0, data.length - 1000);
+      let remainingSpace = sampledData.length - samplePos;
+      
+      for (let i = 0; i < remainingSpace && tailStart + i < data.length; i++) {
+        sampledData[samplePos++] = data[tailStart + i];
+      }
+    }
+    
+    // Build frequency table for common bytes
     const freqTable = new Array(256).fill(0);
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < dictScanSize; i++) {
       freqTable[data[i]]++;
     }
     
     // First pass: find frequent byte pairs for the dictionary
     const pairs = new Map<number, number>(); // Maps pair hash to frequency
     
-    for (let i = 0; i < data.length - 1; i++) {
-      const pairHash = (data[i] << 8) | data[i + 1];
+    // Only scan the sampled data for pairs, not the entire file for large files
+    for (let i = 0; i < sampledData.length - 1; i++) {
+      const pairHash = (sampledData[i] << 8) | sampledData[i + 1];
       pairs.set(pairHash, (pairs.get(pairHash) || 0) + 1);
     }
     
-    // Find most frequent pairs (up to 16)
+    // Find most frequent pairs - increase max pairs for larger files
+    const maxPairs = data.length > 100000 ? 24 : 16; 
+    
     const pairsArray = Array.from(pairs.entries());
     const sortedPairs = pairsArray
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 16)
+      .slice(0, maxPairs)
       .map(entry => entry[0]);
     
     if (sortedPairs.length === 0) {
@@ -711,6 +897,52 @@ class PrimeCompressWasm {
       return [pairHash >> 8, pairHash & 0xFF];
     });
     
+    // Estimate compression ratio before fully compressing
+    // This avoids wasteful work for incompressible data
+    if (data.length > 10000) {
+      // Sample first 10K to estimate compression ratio
+      const sampleCompressed = [];
+      let i = 0;
+      const sampleLimit = Math.min(10000, data.length);
+      
+      while (i < sampleLimit) {
+        if (i < sampleLimit - 1) {
+          const pairHash = (data[i] << 8) | data[i + 1];
+          const dictIndex = sortedPairs.indexOf(pairHash);
+          
+          if (dictIndex >= 0) {
+            // Dictionary reference
+            sampleCompressed.push(0xE0 | dictIndex);
+            i += 2;
+            continue;
+          }
+        }
+        
+        // Literal byte
+        sampleCompressed.push(data[i]);
+        i++;
+      }
+      
+      // Add dictionary overhead
+      const dictionarySize = 2 + (dictionary.length * 2);
+      const estimatedRatio = sampleLimit / (sampleCompressed.length + dictionarySize);
+      
+      // If compression ratio is poor, fall back to pattern compression or raw storage
+      if (estimatedRatio < 1.05) {
+        // For very poor compression, just store raw
+        if (estimatedRatio < 1.01) {
+          const result = new Uint8Array(data.length + 3);
+          result[0] = 0xF7; // Marker for uncompressed data
+          result[1] = data.length & 0xFF; // Length (low byte)
+          result[2] = (data.length >> 8) & 0xFF; // Length (high byte)
+          result.set(data, 3);
+          return result;
+        } else {
+          return this.patternCompress(data);
+        }
+      }
+    }
+    
     // Compress data using the dictionary
     const compressed = [];
     compressed.push(0xF6); // Marker for dictionary compression
@@ -721,6 +953,11 @@ class PrimeCompressWasm {
       compressed.push(byte1);
       compressed.push(byte2);
     }
+    
+    // Use a larger run length tracking for better compression
+    let lastLiteral = -1;
+    let literalCount = 0;
+    const MAX_LITERAL_RUN = 255;
     
     // Compress data
     let i = 0;
@@ -869,22 +1106,57 @@ class PrimeCompressWasm {
     strategies: any
   ): Uint8Array {
     // Size for each block - adaptive based on total size
-    const blockSize = data.length > 1024 * 1024 ? 65536 : 16384; // 64KB blocks for >1MB data, 16KB otherwise
+    let blockSize: number;
     
+    // Choose block size based on data size
+    if (data.length > 100 * 1024 * 1024) { // >100MB
+      blockSize = 1024 * 1024; // 1MB blocks for very large files
+    } else if (data.length > 10 * 1024 * 1024) { // >10MB
+      blockSize = 256 * 1024; // 256KB blocks for large files
+    } else if (data.length > 1024 * 1024) { // >1MB
+      blockSize = 64 * 1024; // 64KB blocks for medium files
+    } else if (data.length > 100 * 1024) { // >100KB
+      blockSize = 32 * 1024; // 32KB for small-medium files
+    } else {
+      blockSize = 16 * 1024; // 16KB for small files
+    }
+    
+    // Calculate number of blocks
     const numBlocks = Math.ceil(data.length / blockSize);
+    
+    // Limit number of blocks to avoid excessive memory usage
+    const MAX_BLOCKS = 1000;
+    if (numBlocks > MAX_BLOCKS) {
+      // Recalculate block size to stay under MAX_BLOCKS
+      blockSize = Math.ceil(data.length / MAX_BLOCKS);
+      console.debug(`Adjusted block size to ${blockSize} bytes to limit block count`);
+    }
+    
+    // Prepare storage arrays
     const blocks: Uint8Array[] = [];
     const blockStrategies: string[] = [];
     const blockSizes: number[] = [];
     
     // Initial blocks array will contain a header
-    // Format: [0xB1, block count (2 bytes), block size (2 bytes)]
-    const header = new Uint8Array(5);
+    // Format: [0xB1, block count (2 bytes), block size (4 bytes)]
+    // Extended to 4 bytes for block size to support larger blocks
+    const header = new Uint8Array(7);
     header[0] = 0xB1; // Block marker
     header[1] = numBlocks & 0xFF; // Block count low byte
     header[2] = (numBlocks >> 8) & 0xFF; // Block count high byte
-    header[3] = blockSize & 0xFF; // Block size low byte
-    header[4] = (blockSize >> 8) & 0xFF; // Block size high byte
+    header[3] = blockSize & 0xFF; // Block size byte 1 (LSB)
+    header[4] = (blockSize >> 8) & 0xFF; // Block size byte 2
+    header[5] = (blockSize >> 16) & 0xFF; // Block size byte 3
+    header[6] = (blockSize >> 24) & 0xFF; // Block size byte 4 (MSB)
     blocks.push(header);
+    
+    // Strategy diversity tracking to log compression effectiveness
+    const strategyUsage: { [key: string]: number } = {
+      'pattern': 0,
+      'sequential': 0,
+      'spectral': 0,
+      'dictionary': 0
+    };
     
     // Process each block
     for (let i = 0; i < numBlocks; i++) {
@@ -892,50 +1164,94 @@ class PrimeCompressWasm {
       const blockEnd = Math.min(blockStart + blockSize, data.length);
       const block = data.slice(blockStart, blockEnd);
       
-      // Analyze this block for optimal strategy
+      // For extremely large files, limit analysis to improve performance
+      const shouldAnalyze = data.length < 50 * 1024 * 1024 || // Always analyze if <50MB
+                            i % 5 === 0 || // Sample every 5th block for large files
+                            i < 10 || // Always analyze the first few blocks
+                            i >= numBlocks - 5; // Always analyze the last few blocks
+      
+      // Analyze this block for optimal strategy if needed
       let blockStrategy = defaultStrategy;
-      if (defaultStrategy === 'auto') {
+      if (defaultStrategy === 'auto' && shouldAnalyze) {
         blockStrategy = this.autoCompress(block).strategy;
+      } else if (defaultStrategy === 'auto') {
+        // For skipped blocks in very large files, use dictionary as safe default
+        blockStrategy = 'dictionary';
       }
       
       // Compress block
       let compressedBlock: Uint8Array;
-      switch (blockStrategy) {
-        case 'pattern':
-          compressedBlock = strategies.pattern(block);
-          break;
-        case 'sequential':
-          compressedBlock = strategies.sequential(block);
-          break;
-        case 'spectral':
-          compressedBlock = strategies.spectral(block);
-          break;
-        case 'dictionary':
-          compressedBlock = strategies.dictionary(block);
-          break;
-        default:
-          compressedBlock = strategies.dictionary(block);
-          blockStrategy = 'dictionary';
+      try {
+        switch (blockStrategy) {
+          case 'pattern':
+            compressedBlock = strategies.pattern(block);
+            break;
+          case 'sequential':
+            compressedBlock = strategies.sequential(block);
+            break;
+          case 'spectral':
+            compressedBlock = strategies.spectral(block);
+            break;
+          case 'dictionary':
+            compressedBlock = strategies.dictionary(block);
+            break;
+          default:
+            compressedBlock = strategies.dictionary(block);
+            blockStrategy = 'dictionary';
+        }
+      } catch (error) {
+        // Fallback in case of any compression error
+        console.error(`Error compressing block ${i}, falling back to dictionary:`, error);
+        compressedBlock = strategies.dictionary(block);
+        blockStrategy = 'dictionary';
       }
       
-      // Create block header [strategy id (1 byte), size (2 bytes)]
-      const blockHeader = new Uint8Array(3);
+      // Track strategy usage
+      strategyUsage[blockStrategy]++;
+      
+      // Check if compression is beneficial for this block
+      if (compressedBlock.length >= block.length) {
+        // If compression didn't help, store block uncompressed
+        compressedBlock = new Uint8Array(block.length + 3);
+        compressedBlock[0] = 0xF7; // Marker for uncompressed data
+        compressedBlock[1] = block.length & 0xFF; // Length (low byte)
+        compressedBlock[2] = (block.length >> 8) & 0xFF; // Length (high byte)
+        compressedBlock.set(block, 3);
+        blockStrategy = 'raw';
+        
+        // Update tracking
+        if (!strategyUsage['raw']) strategyUsage['raw'] = 0;
+        strategyUsage['raw']++;
+      }
+      
+      // Create block header [strategy id (1 byte), size (4 bytes for larger blocks)]
+      const blockHeader = new Uint8Array(5);
       const strategyId = this.getStrategyId(blockStrategy);
       blockHeader[0] = strategyId;
-      blockHeader[1] = compressedBlock.length & 0xFF; // Size low byte
-      blockHeader[2] = (compressedBlock.length >> 8) & 0xFF; // Size high byte
+      blockHeader[1] = compressedBlock.length & 0xFF; // Size byte 1 (LSB)
+      blockHeader[2] = (compressedBlock.length >> 8) & 0xFF; // Size byte 2
+      blockHeader[3] = (compressedBlock.length >> 16) & 0xFF; // Size byte 3
+      blockHeader[4] = (compressedBlock.length >> 24) & 0xFF; // Size byte 4 (MSB)
       
       // Store block and metadata
       blocks.push(blockHeader);
       blocks.push(compressedBlock);
       blockStrategies.push(blockStrategy);
       blockSizes.push(compressedBlock.length);
+      
+      // Log progress for large files
+      if (numBlocks > 20 && (i === 0 || i === numBlocks - 1 || i % 10 === 0)) {
+        console.debug(`Block ${i+1}/${numBlocks} compressed`);
+      }
     }
     
+    // Log strategy usage stats
+    console.debug('Block compression strategy usage:', strategyUsage);
+    
     // Calculate total size needed
-    let totalSize = 5; // Header size
+    let totalSize = 7; // Header size (increased to 7 bytes)
     for (let i = 0; i < numBlocks; i++) {
-      totalSize += 3; // Block header size
+      totalSize += 5; // Block header size (increased to 5 bytes)
       totalSize += blockSizes[i]; // Block data size
     }
     
@@ -949,6 +1265,12 @@ class PrimeCompressWasm {
       offset += block.length;
     }
     
+    // Log overall compression effectiveness
+    const originalSize = data.length;
+    const compressedSize = result.length;
+    const compressionRatio = originalSize / compressedSize;
+    console.debug(`Block compression complete: ${originalSize} → ${compressedSize} bytes (${compressionRatio.toFixed(2)}x ratio)`);
+    
     return result;
   }
   
@@ -961,6 +1283,7 @@ class PrimeCompressWasm {
       case 'sequential': return 2;
       case 'spectral': return 3;
       case 'dictionary': return 4;
+      case 'raw': return 5; // Uncompressed data
       default: return 0; // Auto or unknown
     }
   }
@@ -1229,8 +1552,14 @@ class PrimeCompressWasm {
    * Decompress block-based compression format
    */
   private async decompressBlocks(compressedData: Uint8Array): Promise<Uint8Array> {
-    if (compressedData.length < 5) {
-      throw new Error('Invalid block-compressed data format');
+    // Check for minimum valid header size
+    if (compressedData.length < 7) {
+      throw new Error('Invalid block-compressed data format: Header too small');
+    }
+    
+    // Check marker byte
+    if (compressedData[0] !== 0xB1) {
+      throw new Error('Invalid block-compressed data format: Invalid marker byte');
     }
     
     // Read header
@@ -1238,50 +1567,108 @@ class PrimeCompressWasm {
     const blockCountHigh = compressedData[2];
     const blockCount = blockCountLow | (blockCountHigh << 8);
     
-    // Skip the block size bytes (bytes 3-4) as we don't need them for decompression
-    // Each block has its own size in its header
+    // Read block size (now 4 bytes)
+    const blockSizeByte1 = compressedData[3];
+    const blockSizeByte2 = compressedData[4]; 
+    const blockSizeByte3 = compressedData[5];
+    const blockSizeByte4 = compressedData[6];
+    
+    // Combine into a 32-bit block size
+    const blockSize = blockSizeByte1 | 
+                     (blockSizeByte2 << 8) | 
+                     (blockSizeByte3 << 16) | 
+                     (blockSizeByte4 << 24);
+    
+    console.debug(`Decompressing ${blockCount} blocks with nominal block size of ${blockSize} bytes`);
+    
+    // Sanity check for block count to prevent OOM errors
+    if (blockCount > 10000) {
+      throw new Error(`Invalid block count: ${blockCount} (maximum 10000)`);
+    }
     
     // An array to hold all decompressed blocks
     const decompressedBlocks: Uint8Array[] = [];
-    let offset = 5; // Start after header
+    let offset = 7; // Start after 7-byte header
     
     // Decompress each block
     for (let i = 0; i < blockCount; i++) {
-      if (offset + 3 > compressedData.length) {
-        throw new Error(`Invalid block header at block ${i}`);
+      // Check if we have enough data for block header (5 bytes)
+      if (offset + 5 > compressedData.length) {
+        throw new Error(`Invalid block header at block ${i}: Not enough data remaining`);
       }
       
-      // Read block header
+      // Read block header - now 5 bytes (1 for strategy, 4 for size)
       const strategyId = compressedData[offset];
-      const blockLengthLow = compressedData[offset + 1];
-      const blockLengthHigh = compressedData[offset + 2];
-      const blockLength = blockLengthLow | (blockLengthHigh << 8);
       
-      offset += 3;
+      // Read 4-byte block length
+      const blockLengthByte1 = compressedData[offset + 1];
+      const blockLengthByte2 = compressedData[offset + 2];
+      const blockLengthByte3 = compressedData[offset + 3];
+      const blockLengthByte4 = compressedData[offset + 4];
       
+      // Combine into a 32-bit block length
+      const blockLength = blockLengthByte1 | 
+                         (blockLengthByte2 << 8) | 
+                         (blockLengthByte3 << 16) | 
+                         (blockLengthByte4 << 24);
+      
+      // Move past the header
+      offset += 5;
+      
+      // Sanity check for block length
+      if (blockLength > 10 * 1024 * 1024) { // Max 10MB per block as sanity check
+        throw new Error(`Invalid block length at block ${i}: ${blockLength} bytes (maximum 10MB)`);
+      }
+      
+      // Check if we have enough data for the block
       if (offset + blockLength > compressedData.length) {
-        throw new Error(`Invalid block data length at block ${i}`);
+        throw new Error(`Invalid block data at block ${i}: Expected ${blockLength} bytes but only ${compressedData.length - offset} remaining`);
       }
       
       // Extract block data
       const blockData = compressedData.slice(offset, offset + blockLength);
       offset += blockLength;
       
-      // Determine strategy from ID
-      const strategy = this.getStrategyFromId(strategyId);
+      // Log progress for large files
+      if (blockCount > 20 && (i === 0 || i === blockCount - 1 || i % 10 === 0)) {
+        console.debug(`Decompressing block ${i+1}/${blockCount}`);
+      }
       
-      // Decompress this block according to its strategy
-      // Add the appropriate marker
-      const markerByte = this.getMarkerForStrategy(strategy, blockData);
-      
-      // Create a new array with the marker + the block data
-      const markedBlockData = new Uint8Array(blockData.length + 1);
-      markedBlockData[0] = markerByte;
-      markedBlockData.set(blockData, 1);
-      
-      // Decompress this block
-      const decompressedBlock = await this.realDecompress(markedBlockData);
-      decompressedBlocks.push(decompressedBlock);
+      try {
+        // Get strategy name from ID
+        const strategy = this.getStrategyFromId(strategyId);
+        
+        // Handle raw blocks directly
+        if (strategy === 'raw' || strategyId === 0xFF) {
+          // Raw blocks are already marked with 0xF7 internally
+          const decompressedBlock = await this.realDecompress(blockData);
+          decompressedBlocks.push(decompressedBlock);
+          continue;
+        }
+        
+        // For compressed blocks, add the appropriate marker if needed
+        // Check if block already has a valid marker
+        if (blockData.length > 0 && this.isValidMarker(blockData[0])) {
+          // Block already has a marker, use as is
+          const decompressedBlock = await this.realDecompress(blockData);
+          decompressedBlocks.push(decompressedBlock);
+        } else {
+          // Add a marker based on the strategy
+          const markerByte = this.getMarkerForStrategy(strategy, blockData);
+          
+          // Create a new array with the marker + the block data
+          const markedBlockData = new Uint8Array(blockData.length + 1);
+          markedBlockData[0] = markerByte;
+          markedBlockData.set(blockData, 1);
+          
+          // Decompress this block
+          const decompressedBlock = await this.realDecompress(markedBlockData);
+          decompressedBlocks.push(decompressedBlock);
+        }
+      } catch (error) {
+        console.error(`Error decompressing block ${i}:`, error);
+        throw new Error(`Failed to decompress block ${i}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     
     // Calculate total decompressed size
@@ -1299,7 +1686,16 @@ class PrimeCompressWasm {
       outputOffset += block.length;
     }
     
+    console.debug(`Block decompression complete: ${compressedData.length} → ${result.length} bytes`);
     return result;
+  }
+  
+  /**
+   * Check if a byte is a valid compression marker
+   */
+  private isValidMarker(byte: number): boolean {
+    const validMarkers = [0xC0, 0xC1, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xB1];
+    return validMarkers.includes(byte);
   }
   
   /**
@@ -1311,6 +1707,8 @@ class PrimeCompressWasm {
       case 2: return 'sequential';
       case 3: return 'spectral';
       case 4: return 'dictionary';
+      case 5: return 'raw'; // Uncompressed data
+      case 0xFF: return 'raw'; // Alternative code for raw
       default: return 'auto';
     }
   }
