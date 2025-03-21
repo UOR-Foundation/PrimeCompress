@@ -60,8 +60,18 @@ class WorkerManager {
         // Always use the inline worker to avoid MIME type issues
         console.log('Creating inline Web Worker for compression operations');
         
-        // Create an inline worker implementation
+        // Create an inline worker implementation that imports PrimeCompressWasm
         const workerBlob = new Blob([`
+          // Get the current script base URL to correctly import PrimeCompressWasm
+          const scriptPath = self.location.href.substring(0, self.location.href.lastIndexOf('/'));
+          const wasmPath = scriptPath + '/../wasm/prime-compress-wasm.js';
+          
+          // Import PrimeCompressWasm as a module
+          importScripts(wasmPath);
+
+          // The WebAssembly module will be available as PrimeCompressWasm
+          let primeCompressWasm = null;
+
           self.onmessage = async function(event) {
             const message = event.data;
             const id = message.id;
@@ -73,52 +83,61 @@ class WorkerManager {
 
               // Handle different operation types
               if (operation === 'loadWasm') {
-                // Mock loading the WebAssembly module
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Initialize the WebAssembly module
+                if (!primeCompressWasm) {
+                  // Wait for the module to be available
+                  if (typeof PrimeCompressWasm !== 'undefined') {
+                    primeCompressWasm = PrimeCompressWasm;
+                    await primeCompressWasm.load();
+                  } else {
+                    throw new Error('PrimeCompressWasm module not found');
+                  }
+                }
                 result = { loaded: true };
               } 
               else if (operation === 'compress') {
-                // Generate mock compression result
+                // Ensure the module is loaded
+                if (!primeCompressWasm) {
+                  if (typeof PrimeCompressWasm !== 'undefined') {
+                    primeCompressWasm = PrimeCompressWasm;
+                    await primeCompressWasm.load();
+                  } else {
+                    throw new Error('PrimeCompressWasm module not found');
+                  }
+                }
+                
+                // Use real compression
                 const data = message.data || new Uint8Array(0);
-                const originalSize = data.length;
-                const ratio = 3 + Math.random();
-                const compressedSize = Math.floor(originalSize / ratio);
-                
-                // Create mock compressed data
-                const compressedData = new Uint8Array(compressedSize);
-                
-                // Mock compression delay
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
-                result = {
-                  originalSize: originalSize,
-                  compressedSize: compressedSize,
-                  compressionRatio: ratio,
-                  strategy: (message.options && message.options.strategy) || 'auto',
-                  compressedData: compressedData,
-                  compressionTime: 50 + Math.random() * 100
-                };
+                result = await primeCompressWasm.compress(data, message.options);
               }
               else if (operation === 'decompress') {
-                // Generate mock decompression result
+                // Ensure the module is loaded
+                if (!primeCompressWasm) {
+                  if (typeof PrimeCompressWasm !== 'undefined') {
+                    primeCompressWasm = PrimeCompressWasm;
+                    await primeCompressWasm.load();
+                  } else {
+                    throw new Error('PrimeCompressWasm module not found');
+                  }
+                }
+                
+                // Use real decompression
                 const compressedData = message.data || new Uint8Array(0);
-                const decompressedSize = compressedData.length * 3;
-                const decompressedData = new Uint8Array(decompressedSize);
-                
-                // Mock decompression delay
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
-                result = decompressedData;
+                result = await primeCompressWasm.decompress(compressedData);
               }
               else if (operation === 'getAvailableStrategies') {
-                // Return available compression strategies
-                result = [
-                  { id: 'auto', name: 'Auto (Best)' },
-                  { id: 'pattern', name: 'Pattern Recognition' },
-                  { id: 'sequential', name: 'Sequential' },
-                  { id: 'spectral', name: 'Spectral' },
-                  { id: 'dictionary', name: 'Dictionary' }
-                ];
+                // Ensure the module is loaded
+                if (!primeCompressWasm) {
+                  if (typeof PrimeCompressWasm !== 'undefined') {
+                    primeCompressWasm = PrimeCompressWasm;
+                    await primeCompressWasm.load();
+                  } else {
+                    throw new Error('PrimeCompressWasm module not found');
+                  }
+                }
+                
+                // Get real strategies
+                result = await primeCompressWasm.getAvailableStrategies();
               }
               else {
                 throw new Error('Unknown operation: ' + operation);
@@ -174,17 +193,21 @@ class WorkerManager {
       console.log(`Sending compression request to worker with ${data.length} bytes`);
       return this.sendMessage('compress', data, options);
     } catch (error) {
-      console.error('Compression failed, falling back to mock implementation:', error);
+      console.error('Worker compression failed, attempting direct compression:', error);
       
-      // Fall back to synchronous mock if worker fails
-      return {
-        originalSize: data.length,
-        compressedSize: Math.floor(data.length / 3),
-        compressionRatio: 3,
-        strategy: options?.strategy || 'auto',
-        compressionTime: 50,
-        compressedData: new Uint8Array(Math.floor(data.length / 3))
-      };
+      // Try to use PrimeCompressWasm directly as a fallback
+      try {
+        // Dynamic import of PrimeCompressWasm
+        const PrimeCompressWasm = await import('../wasm/prime-compress-wasm').then(module => module.default);
+        await PrimeCompressWasm.load();
+        
+        // Use the module directly
+        return await PrimeCompressWasm.compress(data, options);
+      } catch (directError) {
+        console.error('Direct compression also failed:', directError);
+        // In this case, throw the error instead of returning mock data
+        throw new Error(`Compression failed: ${directError.message || 'Unknown error'}`);
+      }
     }
   }
   

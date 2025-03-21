@@ -61,41 +61,11 @@ export const compressFile = async (
 };
 
 /**
- * Simulates a compressed result with delay
- * This is used as a fallback if WebAssembly fails to load
- * NOTE: This is maintained for compatibility with existing code
+ * Legacy function maintained for compatibility with existing code
+ * Now just calls the real compressFile function directly
  */
 export const mockCompressFile = async (file: File) => {
-  try {
-    // Try to use the real implementation first
-    return await compressFile(file);
-  } catch (err) {
-    console.warn('Real compression failed, using mock:', err);
-    
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const originalSize = file.size;
-    // Simulate compression ratio between 2x and 5x
-    const ratio = 2 + Math.random() * 3;
-    const compressedSize = Math.floor(originalSize / ratio);
-    
-    // Create a mock blob for download
-    const mockCompressedData = new Uint8Array(compressedSize);
-    for (let i = 0; i < compressedSize; i++) {
-      mockCompressedData[i] = Math.floor(Math.random() * 256);
-    }
-    const compressedBlob = new Blob([mockCompressedData], { type: 'application/octet-stream' });
-    
-    return {
-      originalSize,
-      compressedSize,
-      compressionRatio: ratio,
-      strategy: 'mock',
-      compressionTime: 500,
-      compressedBlob
-    };
-  }
+  return await compressFile(file);
 };
 
 /**
@@ -112,28 +82,10 @@ export const testCompression = async (
   try {
     console.log(`Running compression test with strategy: ${strategy || 'auto'}`);
     
-    // Use the mockTestCompression function, which now tries the real implementation first
-    // and falls back to mock only if needed
-    return await mockTestCompression(data, strategy);
-  } catch (err) {
-    console.error('Test compression error:', err);
-    throw err;
-  }
-};
-
-/**
- * Mock implementation for testing compression with different strategies
- * Only used as a fallback when the real implementation fails
- */
-const mockTestCompression = async (
-  data: ArrayBuffer, 
-  strategy?: string
-): Promise<CompressionResult> => {
-  try {
-    // Convert ArrayBuffer to Uint8Array for the real implementation
+    // Convert ArrayBuffer to Uint8Array for the compression
     const uint8Data = new Uint8Array(data);
     
-    // Use the worker with real implementation
+    // Build compression options
     const options: CompressionOptions = {};
     if (strategy) {
       options.strategy = strategy;
@@ -150,41 +102,8 @@ const mockTestCompression = async (
       compressionTime: result.compressionTime
     };
   } catch (err) {
-    console.warn('Real compression test failed, using mock:', err);
-    
-    // Simulate processing delay (shorter for better UX)
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const originalSize = data.byteLength;
-    let ratio = 1;
-    let compressionTime = 50 + Math.random() * 100;
-    
-    switch (strategy) {
-      case 'pattern':
-        ratio = 3 + Math.random() * 2;
-        break;
-      case 'sequential':
-        ratio = 2 + Math.random() * 1.5;
-        break;
-      case 'spectral':
-        ratio = 4 + Math.random() * 3;
-        break;
-      case 'dictionary':
-        ratio = 2.5 + Math.random() * 1;
-        break;
-      default:
-        // Auto strategy selects the best one
-        ratio = 3.5 + Math.random() * 2;
-        break;
-    }
-    
-    return {
-      originalSize,
-      compressedSize: Math.floor(originalSize / ratio),
-      compressionRatio: ratio,
-      strategy: strategy || 'auto',
-      compressionTime
-    };
+    console.error('Test compression error:', err);
+    throw err;
   }
 };
 
@@ -205,21 +124,7 @@ export const getAvailableStrategies = async (): Promise<Strategy[]> => {
     console.log('Getting available compression strategies from the WASM module');
     return await workerManager.getAvailableStrategies();
   } catch (err) {
-    console.error('Error getting available strategies, falling back to mock:', err);
-    return getMockStrategies();
+    console.error('Error getting available strategies:', err);
+    throw err;
   }
-};
-
-/**
- * Mock list of available compression strategies
- */
-const getMockStrategies = async (): Promise<Strategy[]> => {
-  // Return mock strategies (with a Promise to match the WASM implementation)
-  return Promise.resolve([
-    { id: 'auto', name: 'Auto (Best)' },
-    { id: 'pattern', name: 'Pattern Recognition' },
-    { id: 'sequential', name: 'Sequential' },
-    { id: 'spectral', name: 'Spectral' },
-    { id: 'dictionary', name: 'Dictionary' }
-  ]);
 };

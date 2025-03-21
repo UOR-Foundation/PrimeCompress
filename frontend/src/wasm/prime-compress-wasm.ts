@@ -757,7 +757,7 @@ class PrimeCompressWasm {
   }
   
   /**
-   * Real compression function with strategy selection
+   * Real compression function with strategy selection and block-based processing
    */
   private realCompress(
     strategies: any,
@@ -787,42 +787,51 @@ class PrimeCompressWasm {
           strategyToUse = autoSelectedStrategy;
         }
         
+        // Determine if we should use block-based compression
+        const useBlocks = options.useBlocks !== false && data.length > 8192; // Default to block compression for data > 8KB
+        
         // Apply the selected compression strategy
         let compressedData: Uint8Array;
         
-        switch (strategyToUse) {
-          case 'pattern':
-            compressedData = strategies.pattern(data);
-            break;
-          case 'sequential':
-            compressedData = strategies.sequential(data);
-            break;
-          case 'spectral':
-            compressedData = strategies.spectral(data);
-            break;
-          case 'dictionary':
-            compressedData = strategies.dictionary(data);
-            break;
-          default:
-            // Fall back to auto-selection
-            const bestStrategy = strategies.auto(data).strategy;
-            switch (bestStrategy) {
-              case 'pattern':
-                compressedData = strategies.pattern(data);
-                break;
-              case 'sequential':
-                compressedData = strategies.sequential(data);
-                break;
-              case 'spectral':
-                compressedData = strategies.spectral(data);
-                break;
-              case 'dictionary':
-                compressedData = strategies.dictionary(data);
-                break;
-              default:
-                compressedData = strategies.dictionary(data);
-                strategyToUse = 'dictionary';
-            }
+        if (useBlocks) {
+          // Block-based compression for large files
+          compressedData = this.compressWithBlocks(data, strategyToUse, strategies);
+        } else {
+          // Regular compression for smaller files
+          switch (strategyToUse) {
+            case 'pattern':
+              compressedData = strategies.pattern(data);
+              break;
+            case 'sequential':
+              compressedData = strategies.sequential(data);
+              break;
+            case 'spectral':
+              compressedData = strategies.spectral(data);
+              break;
+            case 'dictionary':
+              compressedData = strategies.dictionary(data);
+              break;
+            default:
+              // Fall back to auto-selection
+              const bestStrategy = strategies.auto(data).strategy;
+              switch (bestStrategy) {
+                case 'pattern':
+                  compressedData = strategies.pattern(data);
+                  break;
+                case 'sequential':
+                  compressedData = strategies.sequential(data);
+                  break;
+                case 'spectral':
+                  compressedData = strategies.spectral(data);
+                  break;
+                case 'dictionary':
+                  compressedData = strategies.dictionary(data);
+                  break;
+                default:
+                  compressedData = strategies.dictionary(data);
+                  strategyToUse = 'dictionary';
+              }
+          }
         }
         
         // Calculate compression ratio and time
@@ -841,21 +850,120 @@ class PrimeCompressWasm {
       } catch (error) {
         console.error('Compression error:', error);
         
-        // Resolve with uncompressed data if there's an error
-        resolve({
-          compressedData: data,
-          compressionRatio: 1.0,
-          strategy: 'none',
-          originalSize: data.length,
-          compressedSize: data.length,
-          compressionTime: performance.now() - startTime
-        });
+        // In case of error, throw it instead of returning uncompressed data
+        throw new Error(`Compression failed: ${error.message || 'Unknown error'}`);
       }
     });
   }
   
   /**
-   * Real decompression implementation
+   * Block-based compression for large data
+   * Splits data into blocks and compresses each with potentially different strategies
+   */
+  private compressWithBlocks(
+    data: Uint8Array, 
+    defaultStrategy: string,
+    strategies: any
+  ): Uint8Array {
+    // Size for each block - adaptive based on total size
+    const blockSize = data.length > 1024 * 1024 ? 65536 : 16384; // 64KB blocks for >1MB data, 16KB otherwise
+    
+    const numBlocks = Math.ceil(data.length / blockSize);
+    const blocks: Uint8Array[] = [];
+    const blockStrategies: string[] = [];
+    const blockSizes: number[] = [];
+    
+    // Initial blocks array will contain a header
+    // Format: [0xB1, block count (2 bytes), block size (2 bytes)]
+    const header = new Uint8Array(5);
+    header[0] = 0xB1; // Block marker
+    header[1] = numBlocks & 0xFF; // Block count low byte
+    header[2] = (numBlocks >> 8) & 0xFF; // Block count high byte
+    header[3] = blockSize & 0xFF; // Block size low byte
+    header[4] = (blockSize >> 8) & 0xFF; // Block size high byte
+    blocks.push(header);
+    
+    // Process each block
+    for (let i = 0; i < numBlocks; i++) {
+      const blockStart = i * blockSize;
+      const blockEnd = Math.min(blockStart + blockSize, data.length);
+      const block = data.slice(blockStart, blockEnd);
+      
+      // Analyze this block for optimal strategy
+      let blockStrategy = defaultStrategy;
+      if (defaultStrategy === 'auto') {
+        blockStrategy = this.autoCompress(block).strategy;
+      }
+      
+      // Compress block
+      let compressedBlock: Uint8Array;
+      switch (blockStrategy) {
+        case 'pattern':
+          compressedBlock = strategies.pattern(block);
+          break;
+        case 'sequential':
+          compressedBlock = strategies.sequential(block);
+          break;
+        case 'spectral':
+          compressedBlock = strategies.spectral(block);
+          break;
+        case 'dictionary':
+          compressedBlock = strategies.dictionary(block);
+          break;
+        default:
+          compressedBlock = strategies.dictionary(block);
+          blockStrategy = 'dictionary';
+      }
+      
+      // Create block header [strategy id (1 byte), size (2 bytes)]
+      const blockHeader = new Uint8Array(3);
+      const strategyId = this.getStrategyId(blockStrategy);
+      blockHeader[0] = strategyId;
+      blockHeader[1] = compressedBlock.length & 0xFF; // Size low byte
+      blockHeader[2] = (compressedBlock.length >> 8) & 0xFF; // Size high byte
+      
+      // Store block and metadata
+      blocks.push(blockHeader);
+      blocks.push(compressedBlock);
+      blockStrategies.push(blockStrategy);
+      blockSizes.push(compressedBlock.length);
+    }
+    
+    // Calculate total size needed
+    let totalSize = 5; // Header size
+    for (let i = 0; i < numBlocks; i++) {
+      totalSize += 3; // Block header size
+      totalSize += blockSizes[i]; // Block data size
+    }
+    
+    // Combine all blocks
+    const result = new Uint8Array(totalSize);
+    let offset = 0;
+    
+    // Copy all blocks to result
+    for (const block of blocks) {
+      result.set(block, offset);
+      offset += block.length;
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Convert strategy name to ID for block headers
+   */
+  private getStrategyId(strategy: string): number {
+    switch (strategy) {
+      case 'pattern': return 1;
+      case 'sequential': return 2;
+      case 'spectral': return 3;
+      case 'dictionary': return 4;
+      default: return 0; // Auto or unknown
+    }
+  }
+  
+  /**
+   * Real decompression implementation with block support
    */
   private realDecompress(compressedData: Uint8Array): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
@@ -866,6 +974,11 @@ class PrimeCompressWasm {
         
         // Check marker byte to determine compression type
         const marker = compressedData[0];
+        
+        // Handle block-based compression first
+        if (marker === 0xB1) {
+          return this.decompressBlocks(compressedData).then(resolve).catch(reject);
+        }
         
         switch (marker) {
           case 0xC0: // Constant data
@@ -1101,9 +1214,119 @@ class PrimeCompressWasm {
         }
       } catch (error) {
         console.error('Decompression error:', error);
-        reject(new Error(`Decompression error: ${error}`));
+        reject(new Error(`Decompression error: ${error.message || 'Unknown error'}`));
       }
     });
+  }
+  
+  /**
+   * Decompress block-based compression format
+   */
+  private async decompressBlocks(compressedData: Uint8Array): Promise<Uint8Array> {
+    if (compressedData.length < 5) {
+      throw new Error('Invalid block-compressed data format');
+    }
+    
+    // Read header
+    const blockCountLow = compressedData[1];
+    const blockCountHigh = compressedData[2];
+    const blockCount = blockCountLow | (blockCountHigh << 8);
+    
+    // Skip the block size bytes (bytes 3-4) as we don't need them for decompression
+    // Each block has its own size in its header
+    
+    // An array to hold all decompressed blocks
+    const decompressedBlocks: Uint8Array[] = [];
+    let offset = 5; // Start after header
+    
+    // Decompress each block
+    for (let i = 0; i < blockCount; i++) {
+      if (offset + 3 > compressedData.length) {
+        throw new Error(`Invalid block header at block ${i}`);
+      }
+      
+      // Read block header
+      const strategyId = compressedData[offset];
+      const blockLengthLow = compressedData[offset + 1];
+      const blockLengthHigh = compressedData[offset + 2];
+      const blockLength = blockLengthLow | (blockLengthHigh << 8);
+      
+      offset += 3;
+      
+      if (offset + blockLength > compressedData.length) {
+        throw new Error(`Invalid block data length at block ${i}`);
+      }
+      
+      // Extract block data
+      const blockData = compressedData.slice(offset, offset + blockLength);
+      offset += blockLength;
+      
+      // Determine strategy from ID
+      const strategy = this.getStrategyFromId(strategyId);
+      
+      // Decompress this block according to its strategy
+      // Add the appropriate marker
+      const markerByte = this.getMarkerForStrategy(strategy, blockData);
+      
+      // Create a new array with the marker + the block data
+      const markedBlockData = new Uint8Array(blockData.length + 1);
+      markedBlockData[0] = markerByte;
+      markedBlockData.set(blockData, 1);
+      
+      // Decompress this block
+      const decompressedBlock = await this.realDecompress(markedBlockData);
+      decompressedBlocks.push(decompressedBlock);
+    }
+    
+    // Calculate total decompressed size
+    let totalSize = 0;
+    for (const block of decompressedBlocks) {
+      totalSize += block.length;
+    }
+    
+    // Combine all blocks
+    const result = new Uint8Array(totalSize);
+    let outputOffset = 0;
+    
+    for (const block of decompressedBlocks) {
+      result.set(block, outputOffset);
+      outputOffset += block.length;
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Get strategy name from ID for block headers
+   */
+  private getStrategyFromId(id: number): string {
+    switch (id) {
+      case 1: return 'pattern';
+      case 2: return 'sequential';
+      case 3: return 'spectral';
+      case 4: return 'dictionary';
+      default: return 'auto';
+    }
+  }
+  
+  /**
+   * Get the appropriate marker byte for a compression strategy
+   * when decompressing blocks
+   */
+  private getMarkerForStrategy(strategy: string, data: Uint8Array): number {
+    // Detect the marker based on data patterns if not available directly
+    switch (strategy) {
+      case 'pattern':
+        return data.length > 0 && data[0] === 0xFF ? 0xF0 : 0xC0;
+      case 'sequential':
+        return 0xF1;
+      case 'spectral':
+        return 0xF5; // Default to delta encoding
+      case 'dictionary':
+        return 0xF6;
+      default:
+        return 0xF7; // Default to uncompressed
+    }
   }
 
   /**
