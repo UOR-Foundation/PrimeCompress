@@ -90,21 +90,23 @@ class PrimeCompressWasm {
           // This is where we'd use WebAssembly.instantiateStreaming or WebAssembly.instantiate
           // to load the actual module
           
-          // For now, we'll just set a mock wasmModule
+          // For now, we'll just set a mock wasmModule with immediately working functions
           this.wasmModule = {
             compress: this.mockCompress.bind(this),
             decompress: this.mockDecompress.bind(this),
             getAvailableStrategies: this.mockGetAvailableStrategies.bind(this)
           };
           
+          console.log('WebAssembly mock module loaded successfully');
           this.status = WasmStatus.LOADED;
           resolve();
         } catch (err) {
+          console.error('Failed to load WebAssembly mock module:', err);
           this.status = WasmStatus.ERROR;
           this.error = err instanceof Error ? err : new Error(String(err));
           reject(this.error);
         }
-      }, 500);
+      }, 100);
     });
     
     return this.loadPromise;
