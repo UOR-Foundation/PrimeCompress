@@ -150,18 +150,33 @@ class WorkerManager {
             }
             
             calculateEntropy(data) {
+              // For very large files, sample the data instead of processing everything
+              const MAX_ENTROPY_SAMPLE = 1000000; // 1MB max sample for entropy calculation
+              let sampleData = data;
+              
+              if (data.length > MAX_ENTROPY_SAMPLE) {
+                // Take a representative sample for large files
+                const samplingRate = Math.ceil(data.length / MAX_ENTROPY_SAMPLE);
+                const sampleSize = Math.ceil(data.length / samplingRate);
+                sampleData = new Uint8Array(sampleSize);
+                
+                for (let i = 0, j = 0; i < data.length && j < sampleSize; i += samplingRate, j++) {
+                  sampleData[j] = data[i];
+                }
+              }
+              
               const counts = new Array(256).fill(0);
               
-              // Count frequency of each byte value
-              for (let i = 0; i < data.length; i++) {
-                counts[data[i]]++;
+              // Count frequency of each byte value in the sample
+              for (let i = 0; i < sampleData.length; i++) {
+                counts[sampleData[i]]++;
               }
               
               // Calculate entropy
               let entropy = 0;
               for (let i = 0; i < 256; i++) {
                 if (counts[i] > 0) {
-                  const p = counts[i] / data.length;
+                  const p = counts[i] / sampleData.length;
                   entropy -= p * Math.log2(p);
                 }
               }
@@ -173,6 +188,13 @@ class WorkerManager {
             // This is a self-contained implementation that doesn't rely on external imports
             
             autoCompress(data) {
+              // For very large files (>50MB), default to block-based dictionary compression 
+              // to avoid performance issues with analysis
+              const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+              if (data.length > LARGE_FILE_THRESHOLD) {
+                return { strategy: 'dictionary', entropyScore: 7.0 };
+              }
+              
               // Calculate entropy
               const entropy = this.calculateEntropy(data);
               
@@ -305,16 +327,36 @@ class WorkerManager {
               // Check for oscillating patterns in the data
               if (data.length < 16) return false;
               
+              // Limit analysis to prevent array size issues with very large files
+              const maxSamples = 10000; // Analyze at most 10K samples
+              const sampleSize = Math.min(data.length, maxSamples);
+              
+              // For very large files, we'll use sampling instead of full analysis
+              // Take regularly spaced samples to maintain pattern detection
+              const samplingInterval = data.length > maxSamples ? Math.floor(data.length / maxSamples) : 1;
+              
               // Look for sinusoidal-like patterns
-              // Compute first and second derivatives
+              // Compute first and second derivatives using sampling for large files
               const firstDerivative = [];
-              for (let i = 1; i < data.length; i++) {
-                firstDerivative.push((data[i] - data[i-1] + 256) % 256);
+              
+              if (samplingInterval > 1) {
+                // Use sampling for very large files
+                for (let i = samplingInterval; i < data.length; i += samplingInterval) {
+                  firstDerivative.push((data[i] - data[i-samplingInterval] + 256) % 256);
+                }
+              } else {
+                // Use full analysis for smaller files
+                for (let i = 1; i < sampleSize; i++) {
+                  firstDerivative.push((data[i] - data[i-1] + 256) % 256);
+                }
               }
               
               // Check for sign changes in the first derivative
               // which would indicate peaks and valleys
               let signChanges = 0;
+              
+              if (firstDerivative.length === 0) return false;
+              
               let lastSign = firstDerivative[0] > 0 ? 1 : (firstDerivative[0] < 0 ? -1 : 0);
               
               for (let i = 1; i < firstDerivative.length; i++) {
@@ -784,9 +826,26 @@ class WorkerManager {
 
             compressWithBlocks(data, defaultStrategy, strategies) {
               // Size for each block - adaptive based on total size
-              const blockSize = data.length > 1024 * 1024 ? 65536 : 16384; // 64KB blocks for >1MB data, 16KB otherwise
+              // For extremely large files, use even larger blocks
+              let blockSize = 16384; // Default: 16KB
+              
+              if (data.length > 100 * 1024 * 1024) { // >100MB
+                blockSize = 1024 * 1024; // 1MB blocks for very large files
+              } else if (data.length > 10 * 1024 * 1024) { // >10MB
+                blockSize = 262144; // 256KB blocks for large files
+              } else if (data.length > 1024 * 1024) { // >1MB
+                blockSize = 65536; // 64KB blocks for medium files
+              }
               
               const numBlocks = Math.ceil(data.length / blockSize);
+              
+              // Limit number of blocks to avoid memory issues
+              const MAX_BLOCKS = 1000;
+              if (numBlocks > MAX_BLOCKS) {
+                // Recalculate block size to stay under MAX_BLOCKS
+                blockSize = Math.ceil(data.length / MAX_BLOCKS);
+              }
+              
               const blocks = [];
               const blockStrategies = [];
               const blockSizes = [];
