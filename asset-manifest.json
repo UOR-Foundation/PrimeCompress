@@ -1,15 +1,17 @@
 {
   "files": {
     "main.css": "/PrimeCompress/static/css/main.f855e6bc.css",
-    "main.js": "/PrimeCompress/static/js/main.02a72f53.js",
+    "main.js": "/PrimeCompress/static/js/main.0c2bc684.js",
+    "static/js/10.5d7b7210.chunk.js": "/PrimeCompress/static/js/10.5d7b7210.chunk.js",
     "static/js/453.717540d2.chunk.js": "/PrimeCompress/static/js/453.717540d2.chunk.js",
     "index.html": "/PrimeCompress/index.html",
     "main.f855e6bc.css.map": "/PrimeCompress/static/css/main.f855e6bc.css.map",
-    "main.02a72f53.js.map": "/PrimeCompress/static/js/main.02a72f53.js.map",
+    "main.0c2bc684.js.map": "/PrimeCompress/static/js/main.0c2bc684.js.map",
+    "10.5d7b7210.chunk.js.map": "/PrimeCompress/static/js/10.5d7b7210.chunk.js.map",
     "453.717540d2.chunk.js.map": "/PrimeCompress/static/js/453.717540d2.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.f855e6bc.css",
-    "static/js/main.02a72f53.js"
+    "static/js/main.0c2bc684.js"
   ]
 }
