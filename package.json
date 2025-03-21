@@ -38,7 +38,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@uor-foundation/primeos": "UOR-foundation/PrimeOS"
   },
   "devDependencies": {
     "eslint": "^8.53.0",
