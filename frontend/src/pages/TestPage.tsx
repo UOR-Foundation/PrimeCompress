@@ -44,7 +44,21 @@ const CompressionTestPanel = () => {
   const [primeResults, setPrimeResults] = useState<CompressionResult | null>(null);
   const [standardResults, setStandardResults] = useState<CompressionResult | null>(null);
   
-  const strategies = getAvailableStrategies();
+  const [strategies, setStrategies] = useState<Array<{id: string, name: string}>>([{ id: 'auto', name: 'Auto (Best)' }]);
+  
+  // Load strategies at component mount
+  useEffect(() => {
+    const loadStrategies = async () => {
+      try {
+        const availableStrategies = await getAvailableStrategies();
+        setStrategies(availableStrategies);
+      } catch (error) {
+        console.error('Failed to load strategies:', error);
+      }
+    };
+    
+    loadStrategies();
+  }, []);
   
   const sampleTypes = [
     { id: 'text', name: 'Text Data' },
