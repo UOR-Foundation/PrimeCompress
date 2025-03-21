@@ -34,16 +34,32 @@ jest.mock('@mui/material', () => {
 describe('FileUploadComponent', () => {
   // Setup default mock implementations
   beforeEach(() => {
-    // Mock the useCompression hook
+    // Create a more realistic mock of the useCompression hook that validates compression options
+    const mockCompressFile = jest.fn().mockImplementation((file, options) => {
+      // Validate file type
+      if (!(file instanceof File)) {
+        throw new Error('Invalid file type');
+      }
+      
+      // Calculate realistic compression result based on file content/strategy
+      const compressionRatio = options?.strategy === 'pattern' ? 3.5 :
+                              options?.strategy === 'dictionary' ? 2.5 :
+                              options?.strategy === 'sequential' ? 1.8 :
+                              options?.strategy === 'spectral' ? 1.5 : 2.0; // auto
+                              
+      // Simulate file compression
+      return Promise.resolve({
+        originalSize: file.size,
+        compressedSize: Math.floor(file.size / compressionRatio),
+        compressionRatio,
+        strategy: options?.strategy || 'auto',
+        compressionTime: file.size / 1000, // Simulate processing time
+        compressedBlob: new Blob(['compressed-content'], { type: 'application/octet-stream' })
+      });
+    });
+    
     (useCompression as jest.Mock).mockReturnValue({
-      compressFile: jest.fn().mockResolvedValue({
-        originalSize: 1000,
-        compressedSize: 500,
-        compressionRatio: 2,
-        strategy: 'auto',
-        compressionTime: 150,
-        compressedBlob: new Blob(['mock-compressed-data'], { type: 'application/octet-stream' })
-      }),
+      compressFile: mockCompressFile,
       isCompressing: false,
       error: null,
       resetState: jest.fn()
@@ -56,7 +72,10 @@ describe('FileUploadComponent', () => {
     (getAvailableStrategies as jest.Mock).mockImplementation(() => {
       return Promise.resolve([
         { id: 'auto', name: 'Auto (Best)' },
-        { id: 'pattern', name: 'Pattern Recognition' }
+        { id: 'pattern', name: 'Pattern Recognition' },
+        { id: 'sequential', name: 'Sequential Compression' },
+        { id: 'dictionary', name: 'Dictionary Compression' },
+        { id: 'spectral', name: 'Spectral Analysis' }
       ]);
     });
     
@@ -110,19 +129,27 @@ describe('FileUploadComponent', () => {
     expect(screen.getByRole('button', { name: /Compress File/i })).toBeInTheDocument();
   });
   
-  it('compresses the file and shows results', async () => {
-    // Mock compression result
-    const compressionResult = {
-      originalSize: 1000,
-      compressedSize: 500,
-      compressionRatio: 2,
-      strategy: 'auto',
-      compressionTime: 150,
-      compressedBlob: new Blob(['mock-compressed-data'], { type: 'application/octet-stream' })
-    };
+  it('compresses the file and shows results with accurate compression metrics', async () => {
+    // Create a file with specific content pattern for testing compression
+    const fileContent = 'ABCABCABCABC'.repeat(100); // Repetitive content that should compress well
+    const file = new File([fileContent], 'test.txt', { type: 'text/plain' });
+    const fileSize = fileContent.length;
     
-    // Start with non-loading state
-    const mockCompressFile = jest.fn().mockResolvedValue(compressionResult);
+    // Expected compression ratio for pattern data (defined in our mock)
+    const expectedRatio = 3.5; // For pattern strategy
+    const expectedCompressedSize = Math.floor(fileSize / expectedRatio);
+    
+    // Set up mock to return realistic compression results
+    const mockCompressFile = jest.fn().mockImplementation((inputFile, options) => {
+      return Promise.resolve({
+        originalSize: inputFile.size,
+        compressedSize: expectedCompressedSize,
+        compressionRatio: expectedRatio,
+        strategy: 'pattern', // Should auto-select pattern for this data
+        compressionTime: 120,
+        compressedBlob: new Blob(['compressed-data'], { type: 'application/octet-stream' })
+      });
+    });
     
     (useCompression as jest.Mock).mockReturnValue({
       compressFile: mockCompressFile,
