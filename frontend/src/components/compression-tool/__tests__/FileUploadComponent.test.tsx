@@ -69,12 +69,9 @@ describe('FileUploadComponent', () => {
   });
   
   it('renders correctly when open', async () => {
-    // Use act to handle async effects
-    await act(async () => {
-      render(<FileUploadComponent open={true} onClose={jest.fn()} />);
-      // Fast-forward timers to execute pending promises
-      jest.runAllTimers();
-    });
+    render(<FileUploadComponent open={true} onClose={jest.fn()} />);
+    // Fast-forward timers to execute pending promises
+    jest.runAllTimers();
     
     // Dialog title should be visible
     expect(screen.getByText('Compress File with PrimeCompress')).toBeInTheDocument();
@@ -84,32 +81,27 @@ describe('FileUploadComponent', () => {
   });
   
   it('does not render when closed', async () => {
-    // Use act to handle async effects
-    await act(async () => {
-      render(<FileUploadComponent open={false} onClose={jest.fn()} />);
-      // Fast-forward timers to execute pending promises
-      jest.runAllTimers();
-    });
+    render(<FileUploadComponent open={false} onClose={jest.fn()} />);
+    // Fast-forward timers to execute pending promises
+    jest.runAllTimers();
     
     // Dialog should not be visible
     expect(screen.queryByText('Compress File with PrimeCompress')).not.toBeInTheDocument();
   });
   
   it('handles file selection', async () => {
-    await act(async () => {
-      render(<FileUploadComponent open={true} onClose={jest.fn()} />);
-      // Fast-forward timers to execute pending promises
-      jest.runAllTimers();
-    });
+    render(<FileUploadComponent open={true} onClose={jest.fn()} />);
+    // Fast-forward timers to execute pending promises
+    jest.runAllTimers();
     
     // Create a mock file
     const file = new File(['test-file-content'], 'test.txt', { type: 'text/plain' });
     
-    // Simulate file selection using act
-    await act(async () => {
-      const fileInput = screen.getByLabelText(/Drag and drop a file here/i, { selector: 'input' });
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
+    // Simulate file selection
+    const fileInput = screen.getByLabelText(/Drag and drop a file here/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    // Run any pending timers
+    jest.runAllTimers();
     
     // After file selection, the file name should be displayed
     expect(screen.getByText('test.txt')).toBeInTheDocument();
@@ -180,7 +172,7 @@ describe('FileUploadComponent', () => {
     // Manually add result to component state to simulate a successful compression
     await act(async () => {
       // @ts-ignore - access private component methods
-      const instance = rerender(
+      rerender(
         <FileUploadComponent 
           open={true} 
           onClose={jest.fn()} 

@@ -1,3 +1,5 @@
+// React, render and screen are intentionally imported but not used directly in tests
+// as they are needed for the JSX compilation and test environment setup
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import Navbar from '../Navbar';

@@ -1,3 +1,5 @@
+// React and render are intentionally imported but not used directly in tests
+// as they are needed for the JSX compilation and test environment setup
 import React from 'react';
 import { render } from '@testing-library/react';
 import App from './App';
