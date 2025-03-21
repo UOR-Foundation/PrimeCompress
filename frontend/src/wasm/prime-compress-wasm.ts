@@ -453,20 +453,17 @@ class PrimeCompressWasm {
     
     // Check for arithmetic sequence (constant difference)
     const diffs = [];
-    let prevByte = data[0];
     
     // Collect differences, either sequential or sampled
     if (samplingRate > 1) {
       // Sampling approach for large files
       for (let i = samplingRate; i < checkSize; i += samplingRate) {
         diffs.push((data[i] - data[i-samplingRate] + 256) % 256);
-        prevByte = data[i];
       }
     } else {
       // Regular sequential approach for smaller files
       for (let i = 1; i < checkSize; i++) {
         diffs.push((data[i] - data[i-1] + 256) % 256);
-        prevByte = data[i];
       }
     }
     
@@ -954,10 +951,8 @@ class PrimeCompressWasm {
       compressed.push(byte2);
     }
     
-    // Use a larger run length tracking for better compression
-    let lastLiteral = -1;
-    let literalCount = 0;
-    const MAX_LITERAL_RUN = 255;
+    // Compress data directly without run tracking
+    // (future improvement: implement run length encoding for literals)
     
     // Compress data
     let i = 0;
