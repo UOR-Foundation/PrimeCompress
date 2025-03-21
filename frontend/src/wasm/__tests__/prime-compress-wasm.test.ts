@@ -1,4 +1,4 @@
-import PrimeCompressWasm, { WasmStatus, CompressionStrategy } from '../prime-compress-wasm';
+import PrimeCompressWasm, { WasmStatus } from '../prime-compress-wasm';
 
 // Comprehensive tests for the PrimeCompressWasm module
 describe('PrimeCompressWasm', () => {
@@ -64,7 +64,7 @@ describe('PrimeCompressWasm', () => {
       
       decompress: jest.fn().mockImplementation((data) => {
         // Simulated decompression
-        const strategyMarker = data[0];
+        // Get size from data length for testing
         const decompressedSize = data.length * 2; // Simple simulation
         return new Uint8Array(decompressedSize).fill(1);
       }),
@@ -221,14 +221,11 @@ describe('PrimeCompressWasm', () => {
     const testData = new Uint8Array([1, 2, 3, 4, 5]);
     
     // Use a non-standard strategy name
-    try {
+    // Test that invalid strategy throws an error
+    await expect(
       // @ts-ignore - Deliberately using invalid strategy
-      await PrimeCompressWasm.compress(testData, 'invalid_strategy');
-      fail('Should have thrown an error for invalid strategy');
-    } catch (error) {
-      // Expected to fail
-      expect(error).toBeDefined();
-    }
+      PrimeCompressWasm.compress(testData, 'invalid_strategy')
+    ).rejects.toThrow();
   });
 
   it('should correctly report compression metrics', async () => {

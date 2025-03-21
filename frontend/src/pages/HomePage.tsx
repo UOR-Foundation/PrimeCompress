@@ -42,7 +42,7 @@ const HomePage: React.FC = () => {
             PrimeCompress
           </Typography>
           <Typography variant="h5" component="h2" gutterBottom>
-            Advanced compression library with multiple strategies for optimal compression across diverse data types
+            Adaptive compression library with multiple strategies for different data types
           </Typography>
           <Box mt={4}>
             <Button 
@@ -168,28 +168,28 @@ const compressedWithStrategy = compression.compressWithStrategy(data, 'dictionar
             Performance Comparison
           </Typography>
           <Typography variant="body1" paragraph>
-            PrimeCompress outperforms standard compression techniques for specialized data types:
+            PrimeCompress is benchmarked against standard compression techniques:
           </Typography>
           
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Benchmark Results
+                Hutter Prize Benchmark Results
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
-                Improvement over standard compression techniques:
+                Measured against the standard enwik8 (100MB Wikipedia) dataset:
               </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body2">Text Data</Typography>
-                <Typography variant="body2" color="success.main">+185.83%</Typography>
+                <Typography variant="body2">Compression Ratio</Typography>
+                <Typography variant="body2" color="primary.main">See GitHub for latest results</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body2">Mixed Data (Block-Based)</Typography>
-                <Typography variant="body2" color="success.main">+210.59%</Typography>
+                <Typography variant="body2">Best Strategy</Typography>
+                <Typography variant="body2" color="primary.main">Based on data characteristics</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body2">Sine Wave</Typography>
-                <Typography variant="body2" color="success.main">+60.00%</Typography>
+                <Typography variant="body2">Bits Per Character</Typography>
+                <Typography variant="body2" color="primary.main">View benchmark results on GitHub</Typography>
               </Box>
             </CardContent>
           </Card>
@@ -197,10 +197,11 @@ const compressedWithStrategy = compression.compressWithStrategy(data, 'dictionar
           <Button 
             variant="outlined" 
             color="primary"
-            component={RouterLink}
-            to="/test"
+            href="https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Run Test Comparison
+            View Benchmark Results
           </Button>
         </Box>
       </Container>

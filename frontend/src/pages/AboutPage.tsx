@@ -26,8 +26,8 @@ const AboutPage: React.FC = () => {
           About PrimeCompress
         </Typography>
         <Typography variant="body1">
-          PrimeCompress is an advanced compression library featuring multiple strategies
-          for optimal compression across diverse data types.
+          PrimeCompress is a compression library featuring multiple adaptive strategies
+          for different data types, with performance benchmarked against industry standards.
         </Typography>
       </Box>
 
