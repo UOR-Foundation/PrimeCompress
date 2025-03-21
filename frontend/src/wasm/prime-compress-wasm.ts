@@ -8,8 +8,6 @@
 // This is a temporary mock implementation that will be replaced with actual WebAssembly bindings
 // when the WebAssembly build is available.
 
-import { CompressionResult } from '../services/compression';
-
 /**
  * Interface for compression options
  */

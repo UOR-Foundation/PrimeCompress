@@ -44,8 +44,6 @@ interface ErrorResponse {
   error: string;
 }
 
-type WorkerResponse = SuccessResponse | ErrorResponse;
-
 // Create a worker context
 declare const self: {
   onmessage: (event: MessageEvent<WorkerMessage>) => void;

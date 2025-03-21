@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Box, Container, Grid, Paper, Button, Card, CardContent, CardMedia } from '@mui/material';
+import { Typography, Box, Container, Grid, Paper, Button, Card, CardContent } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 
