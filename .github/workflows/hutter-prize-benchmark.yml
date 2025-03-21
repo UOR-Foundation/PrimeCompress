@@ -301,7 +301,7 @@ jobs:
             benchmarks/benchmark-results.json
             public/badges/
           
-      - name: Update README with Badges
+      - name: Update README with Badges and Performance Data
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           # Create badges directory if it doesn't exist
@@ -312,9 +312,40 @@ jobs:
           cp public/badges/hutter-bpc.json badges/
           cp public/badges/hutter-algo.json badges/
           
+          # Extract performance data for README
+          BEST_RATIO=$(cat benchmarks/benchmark-results.json | jq -r 'max_by(.ratio) | .ratio')
+          BEST_ALGO=$(cat benchmarks/benchmark-results.json | jq -r 'max_by(.ratio) | .name')
+          BEST_BPC=$(cat benchmarks/benchmark-results.json | jq -r 'min_by(.bitsPerChar) | .bitsPerChar')
+          BEST_RATIO_FORMATTED=$(printf "%.2f" $BEST_RATIO)
+          
+          # Get gzip data for comparison (baseline)
+          GZIP_RATIO=$(cat benchmarks/benchmark-results.json | jq -r '.[] | select(.name=="gzip-9") | .ratio')
+          GZIP_BPC=$(cat benchmarks/benchmark-results.json | jq -r '.[] | select(.name=="gzip-9") | .bitsPerChar')
+          GZIP_RATIO_FORMATTED=$(printf "%.2f" $GZIP_RATIO)
+          
+          # Calculate percentage improvement over gzip
+          if [[ ! -z "$GZIP_RATIO" && "$GZIP_RATIO" != "null" ]]; then
+            IMPROVEMENT=$(echo "($BEST_RATIO/$GZIP_RATIO - 1) * 100" | bc -l)
+            IMPROVEMENT_FORMATTED=$(printf "%.2f" $IMPROVEMENT)
+            
+            # Create performance summary file
+            cat > public/perf-summary.json << EOF
+            {
+              "best_ratio": "$BEST_RATIO_FORMATTED",
+              "best_algorithm": "$BEST_ALGO",
+              "best_bpc": "$BEST_BPC",
+              "gzip_ratio": "$GZIP_RATIO_FORMATTED",
+              "improvement": "$IMPROVEMENT_FORMATTED"
+            }
+            EOF
+            
+            # Copy to badges directory
+            cp public/perf-summary.json badges/
+          fi
+          
           # Commit and push if there are changes
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add badges/
-          git commit -m "Update Hutter Prize benchmark badges [skip ci]" || echo "No changes to commit"
+          git commit -m "Update Hutter Prize benchmark badges and performance data [skip ci]" || echo "No changes to commit"
           git push

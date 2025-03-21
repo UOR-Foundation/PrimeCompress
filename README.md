@@ -1,6 +1,6 @@
 # PrimeCompress
 
-A sophisticated compression library featuring multiple strategies for optimal compression across diverse data types. Built on mathematical principles and advanced compression techniques to achieve superior compression ratios for various data patterns.
+A compression library featuring multiple adaptive strategies for different data types. Built on mathematical principles and targeted compression techniques to achieve efficient compression across various data patterns.
 
 ## Try it Online
 
@@ -30,18 +30,7 @@ PrimeCompress uses multiple compression strategies:
 
 ## Performance
 
-PrimeCompress delivers impressive compression ratios:
-
-| Data Type | Improvement over Standard Compression |
-|-----------|-------------------------------------|
-| Text | +185.83% |
-| Mixed Data (Block-Based) | +210.59% |
-| Sine Wave | +60.00% |
-| Sequential | Matches standard |
-| Zeros | Matches standard |
-| Random | Matches standard |
-
-Overall average improvement: **40.97%**
+PrimeCompress performance is measured through automated benchmarks. The results below are dynamically updated based on the latest tests.
 
 ### Hutter Prize Benchmark
 
@@ -50,6 +39,8 @@ Our compression performance is measured against the [Hutter Prize](http://prize.
 [![Compression Ratio](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/UOR-Foundation/PrimeCompress/main/badges/hutter-ratio.json)](https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml)
 [![Bits Per Character](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/UOR-Foundation/PrimeCompress/main/badges/hutter-bpc.json)](https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml)
 [![Best Algorithm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/UOR-Foundation/PrimeCompress/main/badges/hutter-algo.json)](https://github.com/UOR-Foundation/PrimeCompress/actions/workflows/hutter-prize-benchmark.yml)
+
+The benchmark compares PrimeCompress against standard algorithms like gzip and brotli. Results are automatically updated with each code change.
 
 You can run the benchmark yourself by triggering the "Hutter Prize Benchmark" workflow in the Actions tab.
 
