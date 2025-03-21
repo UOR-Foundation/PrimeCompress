@@ -1,17 +1,17 @@
 {
   "files": {
     "main.css": "/PrimeCompress/static/css/main.f855e6bc.css",
-    "main.js": "/PrimeCompress/static/js/main.0fac4ebd.js",
-    "static/js/10.8bfa89c0.chunk.js": "/PrimeCompress/static/js/10.8bfa89c0.chunk.js",
+    "main.js": "/PrimeCompress/static/js/main.007310cb.js",
+    "static/js/10.0dd038d7.chunk.js": "/PrimeCompress/static/js/10.0dd038d7.chunk.js",
     "static/js/453.717540d2.chunk.js": "/PrimeCompress/static/js/453.717540d2.chunk.js",
     "index.html": "/PrimeCompress/index.html",
     "main.f855e6bc.css.map": "/PrimeCompress/static/css/main.f855e6bc.css.map",
-    "main.0fac4ebd.js.map": "/PrimeCompress/static/js/main.0fac4ebd.js.map",
-    "10.8bfa89c0.chunk.js.map": "/PrimeCompress/static/js/10.8bfa89c0.chunk.js.map",
+    "main.007310cb.js.map": "/PrimeCompress/static/js/main.007310cb.js.map",
+    "10.0dd038d7.chunk.js.map": "/PrimeCompress/static/js/10.0dd038d7.chunk.js.map",
     "453.717540d2.chunk.js.map": "/PrimeCompress/static/js/453.717540d2.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.f855e6bc.css",
-    "static/js/main.0fac4ebd.js"
+    "static/js/main.007310cb.js"
   ]
 }
