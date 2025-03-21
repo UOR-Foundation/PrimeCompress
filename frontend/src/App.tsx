@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Navbar from './components/common/Navbar';
@@ -21,14 +21,10 @@ const theme = createTheme({
 });
 
 function App() {
-  // Get the basename from the homepage URL in package.json
-  // This is needed for GitHub Pages deployment
-  const basename = process.env.PUBLIC_URL || '';
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router basename={basename}>
+      <HashRouter>
         <div className="App">
           <Navbar />
           <main style={{ padding: '20px' }}>
@@ -39,7 +35,7 @@ function App() {
             </Routes>
           </main>
         </div>
-      </Router>
+      </HashRouter>
     </ThemeProvider>
   );
 }
