@@ -1,6 +1,6 @@
 {
   "name": "@uor-foundation/prime-compress",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Advanced compression library with multiple strategies for optimal compression across diverse data types",
   "main": "src/index.js",
   "scripts": {
@@ -37,8 +37,7 @@
     "registry": "https://npm.pkg.github.com/",
     "access": "public"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "eslint": "^8.53.0",
     "prettier": "^3.0.3"
