@@ -851,7 +851,10 @@ class PrimeCompressWasm {
         console.error('Compression error:', error);
         
         // In case of error, throw it instead of returning uncompressed data
-        throw new Error(`Compression failed: ${error.message || 'Unknown error'}`);
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : String(error);
+        throw new Error(`Compression failed: ${errorMessage || 'Unknown error'}`);
       }
     });
   }
@@ -1214,7 +1217,10 @@ class PrimeCompressWasm {
         }
       } catch (error) {
         console.error('Decompression error:', error);
-        reject(new Error(`Decompression error: ${error.message || 'Unknown error'}`));
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : String(error);
+        reject(new Error(`Decompression error: ${errorMessage || 'Unknown error'}`));
       }
     });
   }

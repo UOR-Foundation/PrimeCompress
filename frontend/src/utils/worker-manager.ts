@@ -206,7 +206,10 @@ class WorkerManager {
       } catch (directError) {
         console.error('Direct compression also failed:', directError);
         // In this case, throw the error instead of returning mock data
-        throw new Error(`Compression failed: ${directError.message || 'Unknown error'}`);
+        const errorMessage = directError instanceof Error 
+          ? directError.message 
+          : String(directError);
+        throw new Error(`Compression failed: ${errorMessage || 'Unknown error'}`);
       }
     }
   }
